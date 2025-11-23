@@ -9,6 +9,10 @@ import { Sector, Module } from './lib/supabase';
 import { Menu, User, Settings } from 'lucide-react';
 import 'katex/dist/katex.min.css';
 import { AdminGenerator } from './components/AdminGenerator';
+import { Leaderboard } from './components/Leaderboard';
+import { Onboarding } from './components/Onboarding';
+import { getRank, getLevelProgress } from './lib/gameLogic';
+import { Trophy } from 'lucide-react';
 
 type View = 'map' | 'modules' | 'reactor';
 
