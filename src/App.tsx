@@ -13,7 +13,6 @@ import { Leaderboard } from './components/Leaderboard';
 import { Onboarding } from './components/Onboarding';
 import { getRank, getLevelProgress } from './lib/gameLogic';
 import { PvPMode } from './components/PvPMode';
-import { Swords } from 'lucide-react';
 
 type View = 'map' | 'modules' | 'reactor' | 'pvp';
 
