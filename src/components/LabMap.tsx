@@ -10,10 +10,12 @@ import {
   Cpu,
   Box,
   Lock,
-  ChevronRight
+  ChevronRight,
+  Swords // <--- Добавляем импорт Мечей (или используй Zap, если Swords нет)
 } from 'lucide-react';
 
-const iconMap = {
+// Словарь иконок. Добавили 'swords' в конец списка.
+const iconMap: Record<string, any> = {
   brain: Brain,
   'git-branch': GitBranch,
   activity: Activity,
@@ -21,9 +23,12 @@ const iconMap = {
   radio: Radio,
   cpu: Cpu,
   box: Box,
+  swords: Swords, // <--- ВАЖНО: Связываем строку из базы с компонентом
+  // Если иконки Swords нет и будет ошибка, замени Swords на Zap вот так:
+  // swords: Zap 
 };
 
-const colorMap = {
+const colorMap: Record<string, string> = {
   emerald: 'from-emerald-500 to-green-500',
   blue: 'from-blue-500 to-cyan-500',
   purple: 'from-purple-500 to-pink-500',
@@ -33,7 +38,7 @@ const colorMap = {
   pink: 'from-pink-500 to-fuchsia-500',
 };
 
-const glowMap = {
+const glowMap: Record<string, string> = {
   emerald: 'shadow-emerald-500/50',
   blue: 'shadow-blue-500/50',
   purple: 'shadow-purple-500/50',
@@ -59,6 +64,7 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
     const { data } = await supabase
       .from('sectors')
       .select('*')
+      .neq('id', 99) // <--- СКРЫВАЕМ PvP СЕКТОР С КАРТЫ (он у нас отдельной кнопкой)
       .order('id');
 
     if (data) {
@@ -71,7 +77,7 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
   };
 
   return (
-    <div className="w-full h-full overflow-y-auto p-8">
+    <div className="w-full h-full overflow-y-auto p-8 pb-32">
       <div className="max-w-7xl mx-auto">
         <div className="mb-12 text-center">
           <div className="inline-block mb-4">
@@ -91,10 +97,12 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sectors.map((sector) => {
-            const Icon = iconMap[sector.icon as keyof typeof iconMap];
+            // Если иконка не найдена, используем Zap как заглушку, чтобы не было краша
+            const Icon = iconMap[sector.icon] || Zap;
+            
             const unlocked = isUnlocked(sector);
-            const gradient = colorMap[sector.color as keyof typeof colorMap];
-            const glow = glowMap[sector.color as keyof typeof colorMap];
+            const gradient = colorMap[sector.color] || 'from-slate-500 to-slate-600';
+            const glow = glowMap[sector.color] || 'shadow-slate-500/50';
 
             return (
               <button
@@ -103,71 +111,4 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
                 disabled={!unlocked}
                 className={`relative group p-6 rounded-2xl border-2 transition-all duration-300 ${
                   unlocked
-                    ? `bg-slate-800/50 backdrop-blur-sm border-${sector.color}-500/30 hover:border-${sector.color}-400 hover:shadow-2xl hover:${glow} hover:scale-[1.02] cursor-pointer`
-                    : 'bg-slate-900/30 border-slate-700/30 cursor-not-allowed opacity-50'
-                }`}
-              >
-                {!unlocked && (
-                  <div className="absolute top-4 right-4">
-                    <Lock className="w-5 h-5 text-slate-500" />
-                  </div>
-                )}
-
-                <div className="flex items-start gap-4 mb-4">
-                  <div className={`p-3 rounded-xl bg-gradient-to-br ${gradient} ${unlocked ? 'shadow-lg' : 'grayscale'}`}>
-                    <Icon className="w-8 h-8 text-white" />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-mono text-sm text-cyan-400/60">
-                        SECTOR {sector.id}
-                      </span>
-                      {unlocked && (
-                        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                      )}
-                    </div>
-                    <h3 className="text-xl font-bold text-white mb-2">
-                      {sector.name}
-                    </h3>
-                  </div>
-                </div>
-
-                <p className="text-cyan-300/60 text-sm mb-4 text-left">
-                  {sector.description}
-                </p>
-
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-cyan-400/40 font-mono">
-                    Требуется: LVL {sector.required_clearance}
-                  </div>
-                  {unlocked && (
-                    <ChevronRight className="w-5 h-5 text-cyan-400 group-hover:translate-x-1 transition-transform" />
-                  )}
-                </div>
-
-                <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${gradient} opacity-0 ${unlocked ? 'group-hover:opacity-5' : ''} transition-opacity pointer-events-none`} />
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="mt-12 p-6 bg-slate-800/30 backdrop-blur-sm border border-cyan-500/20 rounded-xl">
-          <div className="flex items-start gap-4">
-            <div className="p-2 bg-cyan-500/20 rounded-lg">
-              <Activity className="w-5 h-5 text-cyan-400" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-white mb-2">
-                Система прогресса
-              </h3>
-              <p className="text-cyan-300/60 text-sm leading-relaxed">
-                Решайте задачи, чтобы повысить уровень допуска и открыть доступ к новым секторам.
-                Каждый правильный ответ приближает вас к статусу ведущего научного сотрудника.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+                    ? `bg-slate-800/50 backdrop-blur-sm bord
