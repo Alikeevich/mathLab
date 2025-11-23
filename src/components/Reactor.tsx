@@ -262,7 +262,7 @@ export function Reactor({ module, onBack }: ReactorProps) {
                     <AlertCircle className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
                     <div>
                       <div className="text-blue-400 font-semibold text-sm mb-1">Данные разведки</div>
-                      <div className="text-blue-300/80 text-sm">{currentProblem.hint}</div>
+                      <div className="text-blue-300/80 text-sm"><Latex>{currentProblem.hint}</Latex></div>
                     </div>
                   </div>
                 )}
