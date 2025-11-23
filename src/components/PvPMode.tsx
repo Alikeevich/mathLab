@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Latex from 'react-latex-next';
-import { Swords, Loader, Trophy, XCircle, Play } from 'lucide-react';
+import { Zap, Loader, Trophy, XCircle, Play } from 'lucide-react';
 
 // УБРАЛИ ИМПОРТ CONFETTI, ЧТОБЫ НЕ БЫЛО ОШИБОК
 // import confetti from 'canvas-confetti'; 
