@@ -56,3 +56,19 @@ export function getLevelProgress(totalExperiments: number): number {
   // 24 задачи = 2 уровень, 4 задачи в прогрессе (40%)
   return (totalExperiments % 10) * 10;
 }
+
+export function getPvPRank(mmr: number): string {
+  if (mmr < 1100) return "Новичок";      // 1000 - база
+  if (mmr < 1300) return "Боец";         // Выиграл 4-10 игр
+  if (mmr < 1600) return "Гладиатор";    // Серьезный игрок
+  if (mmr < 2000) return "Мастер";       // Олимпиадник
+  return "Легенда";                      // Монстр
+}
+
+export function getPvPColor(mmr: number): string {
+  if (mmr < 1100) return "text-slate-400";
+  if (mmr < 1300) return "text-green-400";
+  if (mmr < 1600) return "text-blue-400";
+  if (mmr < 2000) return "text-purple-400";
+  return "text-amber-400";
+}
