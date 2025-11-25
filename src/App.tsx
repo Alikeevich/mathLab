@@ -106,6 +106,14 @@ function MainApp() {
 
           {/* ПРАВАЯ ЧАСТЬ: Рейтинг и Профиль */}
           <div className="flex items-center gap-3 md:gap-6">
+
+            <button 
+              onClick={() => setShowArchive(true)}
+              className="p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg hover:bg-cyan-500/20 transition-colors group"
+              title="Архив Знаний (Видео)"
+            >
+              <MonitorPlay className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition-transform" />
+            </button>
             
             {/* Кнопка Рейтинга */}
             <button 
