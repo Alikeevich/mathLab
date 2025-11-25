@@ -266,6 +266,8 @@ export function Reactor({ module, onBack }: ReactorProps) {
                   />
                 </div>
 
+                <MathKeypad onKeyPress={handleKeyInput} onBackspace={handleBackspace} />
+
                 {showHint && currentProblem.hint && (
                   <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
                     <AlertCircle className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
