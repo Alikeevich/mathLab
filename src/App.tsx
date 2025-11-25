@@ -192,6 +192,7 @@ function MainApp() {
       </main>
 
       {/* МОДАЛЬНЫЕ ОКНА */}
+      {showArchive && <VideoArchive onClose={() => setShowArchive(false)} />}
       {showOnboarding && <Onboarding onComplete={finishOnboarding} />}
       {showLeaderboard && <Leaderboard onClose={() => setShowLeaderboard(false)} />}
       {showDashboard && <Dashboard onClose={() => setShowDashboard(false)} />}
