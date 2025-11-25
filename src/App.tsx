@@ -23,12 +23,11 @@ function MainApp() {
   const [view, setView] = useState<View>('map');
   const [selectedSector, setSelectedSector] = useState<Sector | null>(null);
   const [selectedModule, setSelectedModule] = useState<Module | null>(null);
-  
-  // Состояния модальных окон
   const [showDashboard, setShowDashboard] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
 
   // Проверка для запуска Онбординга (сюжета)
   useEffect(() => {
