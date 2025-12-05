@@ -6,9 +6,9 @@ import { ModuleViewer } from './components/ModuleViewer';
 import { Reactor } from './components/Reactor';
 import { Dashboard } from './components/Dashboard';
 import { Sector, Module } from './lib/supabase';
-// ИСПРАВЛЕННЫЕ ИМПОРТЫ ИКОНОК
-import { Menu, User, Settings, Trophy, Swords, MonitorPlay } from 'lucide-react';
-import { supabase } from './lib/supabase'; // Добавил явный импорт supabase
+// ИСПРАВЛЕНО: Убрал Swords, добавил Zap и Crown (для админа)
+import { Menu, User, Settings, Trophy, Zap, MonitorPlay, Crown } from 'lucide-react';
+import { supabase } from './lib/supabase';
 import 'katex/dist/katex.min.css';
 import { AdminGenerator } from './components/AdminGenerator';
 import { Leaderboard } from './components/Leaderboard';
@@ -16,6 +16,7 @@ import { Onboarding } from './components/Onboarding';
 import { getRank, getLevelProgress } from './lib/gameLogic';
 import { PvPMode } from './components/PvPMode';
 import { VideoArchive } from './components/VideoArchive';
+import { TournamentAdmin } from './components/TournamentAdmin';
 
 type View = 'map' | 'modules' | 'reactor' | 'pvp';
 
@@ -29,37 +30,35 @@ function MainApp() {
   const [showDashboard, setShowDashboard] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [showAdmin, setShowAdmin] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false); // Генератор задач
+  const [showTournamentAdmin, setShowTournamentAdmin] = useState(false); // Панель турниров
   const [showArchive, setShowArchive] = useState(false);
 
+  // === 1. ВХОД ПО ССЫЛКЕ ТУРНИРА ===
   useEffect(() => {
-  // Проверка URL на наличие кода турнира
-  const params = new URLSearchParams(window.location.search);
-  const tCode = params.get('t');
-  if (tCode) {
-    joinTournament(tCode);
-  }
-}, [user]);
+    const params = new URLSearchParams(window.location.search);
+    const tCode = params.get('t');
+    if (tCode) {
+      joinTournament(tCode);
+    }
+  }, [user]);
 
-async function joinTournament(code: string) {
-  if (!user) return;
-  // 1. Ищем турнир
-  const { data: tour } = await supabase.from('tournaments').select('id').eq('code', code).single();
-  if (tour) {
-    // 2. Вступаем
-    await supabase.from('tournament_participants').upsert({
-      tournament_id: tour.id,
-      user_id: user.id
-    });
-    // 3. Идем в режим PvP (там будет проверка на активную дуэль)
-    // Но пока просто ждем. Для MVP, если турнир начнется, создастся дуэль,
-    // и сработает наш "Auto-Reconnect" из прошлого шага!
-    alert("Вы зарегистрированы в турнире! Ожидайте начала битвы.");
-    setView('pvp'); // Кидаем в PvP лобби, там он будет ждать дуэли
+  async function joinTournament(code: string) {
+    if (!user) return;
+    const { data: tour } = await supabase.from('tournaments').select('id').eq('code', code).single();
+    if (tour) {
+      await supabase.from('tournament_participants').upsert({
+        tournament_id: tour.id,
+        user_id: user.id
+      });
+      // Убираем параметр из URL, чтобы не мешал
+      window.history.replaceState({}, document.title, "/");
+      alert("Вы зарегистрированы в турнире! Ожидайте начала битвы в PvP лобби.");
+      setView('pvp');
+    }
   }
-}
 
-  // === АВТО-РЕКОННЕКТ К БИТВЕ ===
+  // === 2. АВТО-РЕКОННЕКТ К БИТВЕ ===
   useEffect(() => {
     async function checkActiveDuel() {
       if (!user) return;
@@ -78,7 +77,7 @@ async function joinTournament(code: string) {
     checkActiveDuel();
   }, [user]);
 
-  // Проверка для запуска Онбординга (сюжета)
+  // === 3. ОНБОРДИНГ ===
   useEffect(() => {
     if (profile && profile.total_experiments === 0 && profile.clearance_level === 0) {
       const hasSeen = localStorage.getItem('onboarding_seen');
@@ -151,7 +150,7 @@ async function joinTournament(code: string) {
 
           <div className="flex items-center gap-3 md:gap-6">
             
-            {/* Кнопка Архива Видео */}
+            {/* Кнопка Архива */}
             <button 
               onClick={() => setShowArchive(true)}
               className="p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg hover:bg-cyan-500/20 transition-colors group"
@@ -169,6 +168,7 @@ async function joinTournament(code: string) {
               <Trophy className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
             </button>
 
+            {/* Профиль */}
             <button
               onClick={() => setShowDashboard(true)}
               className="flex flex-col items-end min-w-[140px] group"
@@ -209,7 +209,8 @@ async function joinTournament(code: string) {
                 className="group relative flex items-center gap-3 bg-slate-900 border-2 border-red-600 px-8 py-4 rounded-full shadow-[0_0_30px_rgba(220,38,38,0.4)] hover:shadow-[0_0_50px_rgba(220,38,38,0.6)] hover:scale-105 transition-all overflow-hidden"
               >
                 <div className="absolute inset-0 bg-red-600/10 group-hover:bg-red-600/20 transition-colors" />
-                <Swords className="w-8 h-8 text-red-500 fill-current animate-pulse" />
+                {/* ИСПОЛЬЗУЕМ ZAP ВМЕСТО SWORDS */}
+                <Zap className="w-8 h-8 text-red-500 fill-current animate-pulse" />
                 <span className="text-xl font-black text-white tracking-widest italic">PVP ARENA</span>
               </button>
             </div>
@@ -236,14 +237,32 @@ async function joinTournament(code: string) {
       {showDashboard && <Dashboard onClose={() => setShowDashboard(false)} />}
       {showAdmin && <AdminGenerator onClose={() => setShowAdmin(false)} />}
       {showArchive && <VideoArchive onClose={() => setShowArchive(false)} />}
+      {/* Модалка Турнира */}
+      {showTournamentAdmin && <TournamentAdmin onClose={() => setShowTournamentAdmin(false)} />}
 
-      <button
-        onClick={() => setShowAdmin(true)}
-        className="fixed bottom-6 right-6 z-50 p-3 bg-slate-800/90 backdrop-blur-md border border-cyan-500/30 rounded-full shadow-lg shadow-cyan-500/10 hover:bg-slate-700 hover:scale-110 hover:border-cyan-400 transition-all group"
-        title="Терминал Архитектора"
-      >
-        <Settings className="w-6 h-6 text-cyan-400 group-hover:rotate-90 transition-transform duration-700" />
-      </button>
+      {/* КНОПКИ УПРАВЛЕНИЯ (ТОЛЬКО ДЛЯ АДМИНА) */}
+      {profile?.is_admin && (
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+          
+          {/* Создать Турнир */}
+          <button
+            onClick={() => setShowTournamentAdmin(true)}
+            className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-full text-amber-400 hover:bg-amber-500 hover:text-black transition-all shadow-lg"
+            title="Панель Учителя (Турниры)"
+          >
+            <Crown className="w-6 h-6" />
+          </button>
+
+          {/* Добавить задачу */}
+          <button
+            onClick={() => setShowAdmin(true)}
+            className="p-3 bg-slate-800/90 backdrop-blur-md border border-cyan-500/30 rounded-full shadow-lg hover:bg-slate-700 hover:border-cyan-400 transition-all group"
+            title="Терминал Архитектора"
+          >
+            <Settings className="w-6 h-6 text-cyan-400 group-hover:rotate-90 transition-transform duration-700" />
+          </button>
+        </div>
+      )}
 
     </div>
   );
