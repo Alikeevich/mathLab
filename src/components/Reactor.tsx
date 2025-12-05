@@ -107,8 +107,7 @@ export function Reactor({ module, onBack }: ReactorProps) {
 
     setResult(isCorrect ? 'correct' : 'incorrect');
 
-    // 1. ОТПРАВЛЯЕМ В БАЗУ
-    // SQL-триггер сам начислит XP (если не гринд) и пересчитает точность
+    // 1. Отправляем в базу
     await supabase.from('experiments').insert({
       user_id: user.id,
       module_id: module.id,
@@ -118,16 +117,19 @@ export function Reactor({ module, onBack }: ReactorProps) {
       time_spent: timeSpent,
     });
 
-    // 2. Локальная статистика (для красивых цифр прямо сейчас)
+    // 2. Локальная статистика сессии
     setProblemsSolved(prev => prev + 1);
     if (isCorrect) {
       setCorrectCount(prev => prev + 1);
+      
+      // 3. ОБНОВЛЕНИЕ ПРОФИЛЯ (LVL & XP)
+      // Мы даем базе 100мс на выполнение триггера, а потом обновляем данные
+      setTimeout(() => {
+        refreshProfile(); // <--- ВОТ ЭТА МАГИЯ
+      }, 100);
     }
 
-    // ВАЖНО: Мы убрали ручное обновление profiles (total_experiments), 
-    // потому что это теперь делает База Данных автоматически.
-
-    // 3. Обновляем прогресс МОДУЛЯ (Полоска конкретной темы)
+    // 4. Обновляем прогресс модуля
     if (isCorrect) {
         const { data: progressData } = await supabase
           .from('user_progress')
