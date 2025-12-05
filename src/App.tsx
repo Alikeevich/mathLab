@@ -6,14 +6,15 @@ import { ModuleViewer } from './components/ModuleViewer';
 import { Reactor } from './components/Reactor';
 import { Dashboard } from './components/Dashboard';
 import { Sector, Module } from './lib/supabase';
-import { Menu, User, Settings, Trophy, Sword } from 'lucide-react';
+// ИСПРАВЛЕННЫЕ ИМПОРТЫ ИКОНОК
+import { Menu, User, Settings, Trophy, Zap, MonitorPlay } from 'lucide-react';
+import { supabase } from './lib/supabase'; // Добавил явный импорт supabase
 import 'katex/dist/katex.min.css';
 import { AdminGenerator } from './components/AdminGenerator';
 import { Leaderboard } from './components/Leaderboard';
 import { Onboarding } from './components/Onboarding';
 import { getRank, getLevelProgress } from './lib/gameLogic';
 import { PvPMode } from './components/PvPMode';
-import { MonitorPlay } from 'lucide-react';
 import { VideoArchive } from './components/VideoArchive';
 
 type View = 'map' | 'modules' | 'reactor' | 'pvp';
@@ -29,14 +30,13 @@ function MainApp() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
-  const [showArchive, setShowArchive] = useState(false); // Для видео (если добавлял)
+  const [showArchive, setShowArchive] = useState(false);
 
   // === АВТО-РЕКОННЕКТ К БИТВЕ ===
   useEffect(() => {
     async function checkActiveDuel() {
       if (!user) return;
 
-      // Ищем, есть ли я в активной дуэли (как игрок 1 или 2)
       const { data } = await supabase
         .from('duels')
         .select('id')
@@ -45,13 +45,11 @@ function MainApp() {
         .maybeSingle();
 
       if (data) {
-        // Если бой идет — сразу кидаем туда!
         setView('pvp');
       }
     }
     checkActiveDuel();
   }, [user]);
-  // ==============================
 
   // Проверка для запуска Онбординга (сюжета)
   useEffect(() => {
@@ -125,7 +123,17 @@ function MainApp() {
           </button>
 
           <div className="flex items-center gap-3 md:gap-6">
-            {/* Если у тебя есть VideoArchive, добавь кнопку сюда */}
+            
+            {/* Кнопка Архива Видео */}
+            <button 
+              onClick={() => setShowArchive(true)}
+              className="p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg hover:bg-cyan-500/20 transition-colors group"
+              title="Архив Знаний"
+            >
+              <MonitorPlay className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition-transform" />
+            </button>
+
+            {/* Кнопка Рейтинга */}
             <button 
               onClick={() => setShowLeaderboard(true)}
               className="p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-colors group"
@@ -195,11 +203,12 @@ function MainApp() {
         )}
       </main>
 
+      {/* Модальные окна */}
       {showOnboarding && <Onboarding onComplete={finishOnboarding} />}
       {showLeaderboard && <Leaderboard onClose={() => setShowLeaderboard(false)} />}
       {showDashboard && <Dashboard onClose={() => setShowDashboard(false)} />}
       {showAdmin && <AdminGenerator onClose={() => setShowAdmin(false)} />}
-      {/* {showArchive && <VideoArchive onClose={() => setShowArchive(false)} />} */}
+      {showArchive && <VideoArchive onClose={() => setShowArchive(false)} />}
 
       <button
         onClick={() => setShowAdmin(true)}
