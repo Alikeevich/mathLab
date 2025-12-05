@@ -17,14 +17,16 @@ import { getRank, getLevelProgress } from './lib/gameLogic';
 import { PvPMode } from './components/PvPMode';
 import { VideoArchive } from './components/VideoArchive';
 import { TournamentAdmin } from './components/TournamentAdmin';
+import { TournamentLobby } from './components/TournamentLobby';
 
-type View = 'map' | 'modules' | 'reactor' | 'pvp';
+type View = 'map' | 'modules' | 'reactor' | 'pvp' | 'tournament_lobby';
 
 function MainApp() {
   const { user, loading, profile } = useAuth();
   const [view, setView] = useState<View>('map');
   const [selectedSector, setSelectedSector] = useState<Sector | null>(null);
   const [selectedModule, setSelectedModule] = useState<Module | null>(null);
+  const [activeTournamentId, setActiveTournamentId] = useState<string | null>(null);
   
   // Состояния модальных окон
   const [showDashboard, setShowDashboard] = useState(false);
@@ -51,10 +53,15 @@ function MainApp() {
         tournament_id: tour.id,
         user_id: user.id
       });
-      // Убираем параметр из URL, чтобы не мешал
+      
+      // Убираем URL параметр
       window.history.replaceState({}, document.title, "/");
-      alert("Вы зарегистрированы в турнире! Ожидайте начала битвы в PvP лобби.");
-      setView('pvp');
+      
+      // Устанавливаем ID и меняем вид
+      setActiveTournamentId(tour.id);
+      setView('tournament_lobby'); // <--- ВАЖНО
+    } else {
+      alert("Турнир не найден!");
     }
   }
 
@@ -225,6 +232,12 @@ function MainApp() {
         )}
         {view === 'reactor' && selectedModule && (
           <Reactor module={selectedModule} onBack={handleBackToModules} />
+        )}
+        {view === 'tournament_lobby' && activeTournamentId && (
+          <TournamentLobby 
+            tournamentId={activeTournamentId} 
+            onBattleStart={() => setView('pvp')} 
+          />
         )}
         {view === 'pvp' && (
           <PvPMode onBack={handleBackToMap} />
