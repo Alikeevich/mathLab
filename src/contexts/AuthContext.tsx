@@ -9,6 +9,7 @@ type AuthContextType = {
   signUp: (email: string, password: string, username: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>; // <--- НОВАЯ ФУНКЦИЯ
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -18,8 +19,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Функция для принудительного обновления профиля
+  async function refreshProfile() {
+    if (!user) return;
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle();
+    
+    if (data) setProfile(data);
+  }
+
   useEffect(() => {
-    // 1. Проверяем текущую сессию
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -29,7 +41,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    // 2. Слушаем вход/выход
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -43,23 +54,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // === НОВАЯ ФИШКА: REALTIME PROFILE ===
+  // REALTIME ПОДПИСКА (Автоматическое обновление)
   useEffect(() => {
     if (!user) return;
 
-    // Подписываемся на изменения в таблице profiles для ЭТОГО пользователя
     const channel = supabase
-      .channel('profile-changes')
+      .channel('profile-updates')
       .on(
         'postgres_changes',
         {
           event: 'UPDATE',
           schema: 'public',
           table: 'profiles',
-          filter: `id=eq.${user.id}`, // Слушаем только себя
+          filter: `id=eq.${user.id}`,
         },
         (payload) => {
-          // Как только база обновилась - обновляем стейт React
+          // Мгновенно обновляем стейт при сигнале от базы
           setProfile(payload.new as Profile);
         }
       )
@@ -108,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
