@@ -19,6 +19,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // 1. Проверяем текущую сессию
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -28,23 +29,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
+    // 2. Слушаем вход/выход
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      (() => {
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          loadProfile(session.user.id);
-        } else {
-          setProfile(null);
-          setLoading(false);
-        }
-      })();
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        loadProfile(session.user.id);
+      } else {
+        setProfile(null);
+        setLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
+  // === НОВАЯ ФИШКА: REALTIME PROFILE ===
+  useEffect(() => {
+    if (!user) return;
+
+    // Подписываемся на изменения в таблице profiles для ЭТОГО пользователя
+    const channel = supabase
+      .channel('profile-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`, // Слушаем только себя
+        },
+        (payload) => {
+          // Как только база обновилась - обновляем стейт React
+          setProfile(payload.new as Profile);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   async function loadProfile(userId: string) {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
@@ -57,34 +84,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signUp(email: string, password: string, username: string) {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
+    const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
-
     if (data.user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: data.user.id,
-          username,
-          clearance_level: 0,
-          total_experiments: 0,
-          success_rate: 0,
-        });
-
-      if (profileError) throw profileError;
+      await supabase.from('profiles').insert({
+        id: data.user.id,
+        username,
+        clearance_level: 0,
+        total_experiments: 0,
+        success_rate: 0,
+      });
     }
   }
 
   async function signIn(email: string, password: string) {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
   }
 
