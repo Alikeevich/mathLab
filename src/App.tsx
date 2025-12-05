@@ -32,6 +32,33 @@ function MainApp() {
   const [showAdmin, setShowAdmin] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
 
+  useEffect(() => {
+  // Проверка URL на наличие кода турнира
+  const params = new URLSearchParams(window.location.search);
+  const tCode = params.get('t');
+  if (tCode) {
+    joinTournament(tCode);
+  }
+}, [user]);
+
+async function joinTournament(code: string) {
+  if (!user) return;
+  // 1. Ищем турнир
+  const { data: tour } = await supabase.from('tournaments').select('id').eq('code', code).single();
+  if (tour) {
+    // 2. Вступаем
+    await supabase.from('tournament_participants').upsert({
+      tournament_id: tour.id,
+      user_id: user.id
+    });
+    // 3. Идем в режим PvP (там будет проверка на активную дуэль)
+    // Но пока просто ждем. Для MVP, если турнир начнется, создастся дуэль,
+    // и сработает наш "Auto-Reconnect" из прошлого шага!
+    alert("Вы зарегистрированы в турнире! Ожидайте начала битвы.");
+    setView('pvp'); // Кидаем в PvP лобби, там он будет ждать дуэли
+  }
+}
+
   // === АВТО-РЕКОННЕКТ К БИТВЕ ===
   useEffect(() => {
     async function checkActiveDuel() {
