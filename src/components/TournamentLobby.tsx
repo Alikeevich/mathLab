@@ -73,6 +73,36 @@ export function TournamentLobby({ tournamentId, onBattleStart }: LobbyProps) {
     );
   }
 
+  if (status === 'finished') {
+    // Находим победителя из списка участников (нужно будет подтянуть winner_id из турнира или вычислить)
+    // Для простоты покажем сетку, а поверх нее модалку
+    return (
+      <div className="relative h-full">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-1000">
+          <div className="text-center">
+            <Trophy className="w-32 h-32 text-yellow-400 mx-auto mb-6 animate-bounce" />
+            <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-400 mb-4">
+              ТУРНИР ЗАВЕРШЕН!
+            </h1>
+            <p className="text-white text-2xl mb-8">Слава победителю!</p>
+            
+            <button 
+               onClick={() => window.location.reload()} 
+               className="px-8 py-3 bg-slate-800 border border-yellow-500/50 text-yellow-400 rounded-full hover:bg-slate-700 transition-all"
+            >
+              Вернуться в лобби
+            </button>
+          </div>
+        </div>
+        
+        {/* На фоне показываем сетку */}
+        <div className="opacity-20 pointer-events-none h-full p-8">
+           <TournamentBracket tournamentId={tournamentId} onEnterMatch={() => {}} />
+        </div>
+      </div>
+    );
+  }
+
   // === ЕСЛИ ЖДЕМ — ПОКАЗЫВАЕМ СПИСОК ===
   return (
     <div className="flex items-center justify-center h-full p-4">
