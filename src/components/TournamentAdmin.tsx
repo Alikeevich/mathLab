@@ -69,20 +69,23 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
 
     const shuffled = [...participants].sort(() => 0.5 - Math.random());
     
-    // Получаем задачи для PvP (ID модуля 99 - мы его создавали в SQL)
     const { data: allProbs } = await supabase
           .from('problems')
           .select('id')
           .eq('module_id', '00000000-0000-0000-0000-000000000099');
     
     const duelPromises = [];
+    
+    // Идем с шагом 2
     for (let i = 0; i < shuffled.length; i += 2) {
-      if (i + 1 < shuffled.length) {
-        const p1 = shuffled[i];
-        const p2 = shuffled[i+1];
-        
-        const probIds = allProbs?.sort(() => 0.5 - Math.random()).slice(0, 5).map(p => p.id) || [];
+      const p1 = shuffled[i];
+      const p2 = shuffled[i+1]; // Может быть undefined, если игроков нечетное кол-во
 
+      // Генерируем задачи
+      const probIds = allProbs?.sort(() => 0.5 - Math.random()).slice(0, 5).map(p => p.id) || [];
+
+      if (p2) {
+        // ОБЫЧНАЯ ПАРА
         duelPromises.push(
           supabase.from('duels').insert({
             player1_id: p1.user_id,
@@ -93,11 +96,26 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
             round: 1
           })
         );
+      } else {
+        // НЕЧЕТНЫЙ ИГРОК (АВТО-ПОБЕДА)
+        // Создаем дуэль, которая сразу "finished", и p1 объявлен победителем.
+        // Это нужно, чтобы SQL-триггер увидел победу и перевел его во 2-й раунд.
+        duelPromises.push(
+          supabase.from('duels').insert({
+            player1_id: p1.user_id,
+            // player2_id оставляем null
+            status: 'finished', // Сразу закончена
+            winner_id: p1.user_id, // Он победил
+            problem_ids: probIds,
+            tournament_id: tournamentId,
+            round: 1
+          })
+        );
       }
     }
     
     await Promise.all(duelPromises);
-    // Не закрываем админку, а показываем сетку!
+    // Не закрываем, чтобы учитель видел сетку
   }
 
   const joinLink = `${window.location.origin}/?t=${joinCode}`;
