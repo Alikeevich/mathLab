@@ -72,36 +72,21 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
       alert("Нужно минимум 2 участника для старта!");
       return;
     }
-    setStatus('active');
-    await supabase.from('tournaments').update({ status: 'active' }).eq('id', tournamentId);
 
-    // ... (Логика генерации пар осталась прежней, сократил для читаемости)
-    // ГЕНЕРАЦИЯ ДУЭЛЕЙ
-    const shuffled = [...participants].sort(() => 0.5 - Math.random());
-    const { data: allProbs } = await supabase.from('problems').select('id').eq('module_id', '00000000-0000-0000-0000-000000000099');
-    
-    const duelPromises = [];
-    for (let i = 0; i < shuffled.length; i += 2) {
-      const p1 = shuffled[i];
-      const p2 = shuffled[i+1];
-      const probIds = allProbs?.sort(() => 0.5 - Math.random()).slice(0, 5).map(p => p.id) || [];
-
-      if (p2) {
-        duelPromises.push(
-          supabase.from('duels').insert({
-            player1_id: p1.user_id, player2_id: p2.user_id, status: 'active', problem_ids: probIds, tournament_id: tournamentId, round: 1
-          })
-        );
+    try {
+      // Вызываем мощную функцию на сервере
+      const { error } = await supabase.rpc('start_tournament_engine', { t_id: tournamentId });
+      
+      if (error) {
+        console.error('Ошибка старта:', error);
+        alert('Ошибка при запуске турнира. Проверьте консоль.');
       } else {
-        // Нечетный
-        duelPromises.push(
-          supabase.from('duels').insert({
-            player1_id: p1.user_id, status: 'finished', winner_id: p1.user_id, problem_ids: probIds, tournament_id: tournamentId, round: 1
-          })
-        );
+        // Успех! Статус обновится сам через Realtime
+        setStatus('active'); 
       }
+    } catch (err) {
+      console.error(err);
     }
-    await Promise.all(duelPromises);
   }
 
   // 3. УНИЧТОЖЕНИЕ ТУРНИРА (Красная кнопка)
