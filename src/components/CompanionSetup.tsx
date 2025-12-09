@@ -37,21 +37,19 @@ export function CompanionSetup({ onComplete }: Props) {
     );
   }
 
-  // 2. Сцена Находки
+  // 2. Сцена Находки (Используем WAVING)
   if (step === 'found') {
     return (
       <div className="fixed inset-0 bg-slate-900 z-[100] flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-500">
         <div className="relative mb-8">
-          {/* Свечение сзади */}
           <div className="absolute -inset-10 bg-amber-500/20 blur-3xl rounded-full" />
           
-          {/* Контейнер для картинки */}
-          <div className="w-64 h-64 bg-gradient-to-b from-slate-800 to-slate-900 rounded-full border-4 border-amber-500/50 flex items-center justify-center shadow-2xl relative z-10 p-6">
-             {/* ЧИСТЫЙ PNG СУРИКАТА */}
+          <div className="w-64 h-64 bg-gradient-to-b from-slate-800 to-slate-900 rounded-full border-4 border-amber-500/50 flex items-center justify-center shadow-2xl relative z-10 p-4">
+             {/* ТУТ ТЕПЕРЬ МАШЕТ РУКОЙ */}
              <img 
-               src="/meerkat/idle.png" 
+               src="/meerkat/waving.png" 
                alt="Сурикат" 
-               className="w-full h-full object-contain drop-shadow-2xl hover:scale-110 transition-transform duration-500 cursor-pointer" 
+               className="w-full h-full object-contain drop-shadow-2xl hover:scale-110 transition-transform duration-500 cursor-pointer animate-bounce" 
              />
           </div>
           
@@ -62,8 +60,7 @@ export function CompanionSetup({ onComplete }: Props) {
 
         <h2 className="text-4xl font-black text-white mb-4">Это... Сурикат?</h2>
         <p className="text-slate-300 max-w-md mb-10 leading-relaxed text-lg">
-          Удивительно! Этот малыш прятался здесь и решал уравнения на стенах. 
-          Кажется, он хочет стать твоим ассистентом в лаборатории.
+          Удивительно! Этот малыш прятался здесь. Кажется, он рад вас видеть и хочет стать вашим ассистентом!
         </p>
 
         <button 
@@ -76,14 +73,13 @@ export function CompanionSetup({ onComplete }: Props) {
     );
   }
 
-  // 3. Сцена Имени (Сохранение)
+  // 3. Сцена Имени
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !user) return;
     setLoading(true);
 
     try {
-      // Сохраняем имя и начальные статы
       await supabase.from('profiles').update({ 
         companion_name: name,
         companion_level: 1,
@@ -91,11 +87,9 @@ export function CompanionSetup({ onComplete }: Props) {
         companion_hunger: 100
       }).eq('id', user.id);
       
-      // Обновляем контекст, чтобы имя появилось везде
       await refreshProfile();
-      
       setLoading(false);
-      onComplete(); // Завершаем
+      onComplete();
     } catch (error) {
       console.error(error);
       setLoading(false);
@@ -105,12 +99,11 @@ export function CompanionSetup({ onComplete }: Props) {
   return (
     <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in">
       <div className="w-full max-w-md bg-slate-800 border border-amber-500/30 rounded-3xl p-8 shadow-2xl text-center relative overflow-hidden">
-        
-        {/* Фоновый эффект */}
         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-500 to-orange-600" />
 
-        <div className="w-24 h-24 bg-slate-900 rounded-full mx-auto mb-6 flex items-center justify-center border-2 border-amber-500/50 shadow-inner">
-          <img src="/meerkat/idle.png" className="w-16 h-16 object-contain" alt="Icon" />
+        <div className="w-24 h-24 bg-slate-900 rounded-full mx-auto mb-6 flex items-center justify-center border-2 border-amber-500/50 shadow-inner p-2">
+          {/* Тут используем аватарку или просто idle */}
+          <img src="/meerkat/avatar.png" className="w-full h-full object-contain" alt="Icon" />
         </div>
         
         <h2 className="text-2xl font-bold text-white mb-2">Новый сотрудник</h2>
