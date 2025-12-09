@@ -186,21 +186,22 @@ function MainApp() {
             {profile?.companion_name && (
               <button 
                 onClick={() => setShowCompanion(true)}
-                className="relative group p-1 bg-amber-500/10 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-all mr-2 overflow-hidden"
+                // Убрал bg-amber, border и rounded, чтобы не перекрывать твой дизайн
+                className="relative group transition-transform hover:scale-105 mr-2"
                 title={`Домик ${profile.companion_name}`}
               >
-                {/* Картинка или эмодзи, если картинки нет */}
-                <div className="w-8 h-8 flex items-center justify-center">
-                   <img 
-                     src="/meerkat/avatar.png" 
-                     alt="Pet" 
-                     className="w-full h-full object-cover mix-blend-screen group-hover:scale-110 transition-transform"
-                     onError={(e) => { e.currentTarget.style.display='none'; e.currentTarget.parentElement!.innerText = '🦦'; }}
-                   />
-                </div>
-                {/* Индикатор голода */}
+                <img 
+                  src="/meerkat/avatar.png" 
+                  alt="Pet" 
+                  // object-contain: чтобы картинка не обрезалась
+                  // mix-blend-screen: убирает черный фон, если он есть
+                  className="w-10 h-10 object-contain mix-blend-screen drop-shadow-[0_0_10px_rgba(245,158,11,0.5)]"
+                  onError={(e) => { e.currentTarget.style.display='none'; e.currentTarget.parentElement!.innerText = '🦦'; }}
+                />
+                
+                {/* Индикатор голода (немного сдвинул, чтобы был на краю картинки) */}
                 {profile.companion_hunger < 30 && (
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-ping" />
+                  <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 border-2 border-slate-900 rounded-full animate-ping" />
                 )}
               </button>
             )}
