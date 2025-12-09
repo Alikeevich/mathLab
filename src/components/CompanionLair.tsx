@@ -25,7 +25,7 @@ export function CompanionLair({ onClose }: Props) {
   const feedCompanion = async () => {
     if (hunger >= 100) return;
     
-    setAnimationState('eating');
+    setAnimationState('eating'); // ВКЛЮЧАЕМ EATING.PNG
     
     const newHunger = Math.min(100, hunger + 20);
     setHunger(newHunger);
@@ -35,28 +35,30 @@ export function CompanionLair({ onClose }: Props) {
       last_fed_at: new Date().toISOString()
     }).eq('id', profile!.id);
 
-    setTimeout(() => setAnimationState('happy'), 1000);
-    setTimeout(() => setAnimationState('idle'), 3000);
+    setTimeout(() => setAnimationState('happy'), 1500); // ПОТОМ HAPPY.PNG
+    setTimeout(() => setAnimationState('idle'), 3500);  // ПОТОМ IDLE.PNG
     
     refreshProfile();
   };
 
-  // Выбираем картинку в зависимости от состояния
-  // Если у тебя нет happy.png, везде ставь idle.png, анимация сделает остальное
+  // УМНЫЙ ВЫБОР СПРАЙТА
   const getSprite = () => {
-    switch (animationState) {
-      case 'eating': return '/meerkat/happy.png'; // Или idle.png
-      case 'happy': return '/meerkat/happy.png'; // Или idle.png
-      default: return '/meerkat/idle.png';
-    }
+    // 1. Приоритет анимациям (ест или радуется)
+    if (animationState === 'eating') return '/meerkat/eating.png';
+    if (animationState === 'happy') return '/meerkat/happy.png';
+    
+    // 2. Если анимации нет, смотрим на состояние (голод)
+    if (hunger < 30) return '/meerkat/crying.png'; // ПЛАЧЕТ, ЕСЛИ ГОЛОДЕН
+    
+    // 3. Стандарт
+    return '/meerkat/idle.png';
   };
 
-  // Класс анимации
   const getAnimationClass = () => {
     switch (animationState) {
-      case 'eating': return 'animate-bounce'; // Прыгает когда ест
-      case 'happy': return 'animate-pulse scale-110'; // Светится от счастья
-      default: return 'hover:scale-105'; // Просто дышит
+      case 'eating': return 'animate-bounce'; 
+      case 'happy': return 'animate-pulse scale-110';
+      default: return hunger < 30 ? 'animate-pulse opacity-80' : 'hover:scale-105'; // Если плачет - пульсирует грустно
     }
   };
 
@@ -83,19 +85,21 @@ export function CompanionLair({ onClose }: Props) {
           
           <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_50%_50%,rgba(245,158,11,0.1),transparent_70%)]" />
 
-          {/* КАРТИНКА (ЧИСТЫЙ PNG) */}
-          <div className={`relative z-10 transition-all duration-500 ${getAnimationClass()}`}>
+          {/* ПЕРСОНАЖ */}
+          <div 
+             className={`relative z-10 transition-all duration-500 cursor-pointer ${getAnimationClass()}`}
+             onClick={() => setAnimationState('happy')} // Клик = Погладить
+          >
              <img 
                src={getSprite()} 
                alt="Сурикат" 
                className="w-56 h-56 object-contain drop-shadow-2xl" 
-               // Важно: убрали mix-blend-screen, так как фон прозрачный
              />
           </div>
 
           {hunger < 30 && (
-            <div className="absolute top-4 right-10 bg-white text-black text-xs font-bold px-3 py-1 rounded-xl animate-bounce shadow-lg">
-              Хочу кушать! 🍖
+            <div className="absolute top-4 right-10 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-xl animate-bounce shadow-lg">
+              Покорми меня! 🍖
             </div>
           )}
         </div>
