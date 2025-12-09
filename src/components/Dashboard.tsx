@@ -138,11 +138,15 @@ export function Dashboard({ onClose }: DashboardProps) {
                 </div>
                 <div className="text-xl font-bold text-white truncate relative z-10">{profile.username}</div>
                 
-                {/* БЛОК СУРИКАТА (ПОЯВЛЯЕТСЯ, ЕСЛИ ЕСТЬ ИМЯ) */}
                 {profile.companion_name && (
                   <div className="mt-4 pt-4 border-t border-slate-700 flex items-center gap-3 animate-in slide-in-from-left-4 fade-in duration-500">
-                     <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center text-2xl border border-amber-500/50 shadow-lg shadow-amber-500/10">
-                       🦦
+                     {/* ЗАМЕНЯЕМ ЭМОДЗИ НА AVATAR.PNG */}
+                     <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center overflow-hidden border border-amber-500/50 shadow-lg shadow-amber-500/10">
+                       <img 
+                         src="/meerkat/avatar.png" 
+                         alt="Pet" 
+                         className="w-full h-full object-cover mix-blend-screen"
+                       />
                      </div>
                      <div>
                        <div className="text-[10px] text-amber-400/60 font-mono uppercase tracking-wider">Компаньон</div>
