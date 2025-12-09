@@ -267,6 +267,7 @@ function MainApp() {
       {showArchive && <VideoArchive onClose={() => setShowArchive(false)} />}
       {showTournamentAdmin && <TournamentAdmin onClose={() => setShowTournamentAdmin(false)} />}
       {showJoinCode && <JoinTournamentModal onJoin={joinTournament} onClose={() => setShowJoinCode(false)} />}
+      {showCompanion && <CompanionLair onClose={() => setShowCompanion(false)} />}
 
       {profile?.companion_name && (
         <button 
