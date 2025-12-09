@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Latex from 'react-latex-next';
-import { Zap, Loader, Trophy, XCircle, CheckCircle2, Timer, ArrowLeft } from 'lucide-react';
+import { Zap, Loader, Trophy, XCircle, CheckCircle2, Timer, ArrowLeft, Flag, AlertTriangle, WifiOff } from 'lucide-react';
 import { MathKeypad } from './MathKeypad';
 import { checkAnswer } from '../lib/mathUtils';
 
@@ -14,7 +14,7 @@ type Props = {
 export function TournamentPlay({ duelId, onFinished }: Props) {
   const { user } = useAuth();
   
-  // Состояния игры
+  // Состояния
   const [loading, setLoading] = useState(true);
   const [opponentName, setOpponentName] = useState<string>('Соперник');
   
@@ -28,8 +28,11 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
   const [timeLeft, setTimeLeft] = useState(60);
   const [matchStatus, setMatchStatus] = useState<'active' | 'finished'>('active');
   const [winnerId, setWinnerId] = useState<string | null>(null);
+  
+  const [showSurrenderModal, setShowSurrenderModal] = useState(false);
+  const [opponentDisconnected, setOpponentDisconnected] = useState(false);
 
-  // Клавиатура
+  // === ФУНКЦИИ КЛАВИАТУРЫ ===
   const handleKeyInput = (s: string) => setUserAnswer(p => p + s);
   const handleBackspace = () => setUserAnswer(p => p.slice(0, -1));
 
@@ -40,11 +43,10 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
       
       const { data: duel } = await supabase.from('duels').select('*').eq('id', duelId).single();
       if (!duel) {
-        onFinished(); // Дуэли нет - уходим
+        onFinished(); 
         return;
       }
 
-      // Если матч уже все - показываем результат
       if (duel.status === 'finished') {
         setMatchStatus('finished');
         setWinnerId(duel.winner_id);
@@ -54,22 +56,19 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
         return;
       }
 
-      // Определяем соперника
       const isP1 = duel.player1_id === user.id;
       const oppId = isP1 ? duel.player2_id : duel.player1_id;
       
-      // Грузим задачи
       await loadProblems(duel.problem_ids);
       
-      // Грузим имя врага
       if (oppId) {
         const { data: oppProfile } = await supabase.from('profiles').select('username').eq('id', oppId).single();
         if (oppProfile) setOpponentName(oppProfile.username);
       } else {
-        setOpponentName("Ожидание..."); // Если нечетный игрок (авто-победа)
+        setOpponentName("Ожидание...");
       }
 
-      // Восстанавливаем прогресс (Реконнект внутри боя)
+      // Восстановление прогресса
       const myProg = isP1 ? duel.player1_progress : duel.player2_progress;
       const myPts = isP1 ? duel.player1_score : duel.player2_score;
       const oppPts = isP1 ? duel.player2_score : duel.player1_score;
@@ -80,7 +79,6 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
 
       setLoading(false);
       
-      // Подписка на врага
       subscribeToDuel(duel.id, isP1);
     }
     initMatch();
@@ -93,12 +91,9 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'duels', filter: `id=eq.${dId}` }, 
       (payload) => {
         const newData = payload.new;
-        
-        // Обновляем очки врага
         const newOppScore = isP1 ? newData.player2_score : newData.player1_score;
         setOppScore(newOppScore);
 
-        // Если матч кончился
         if (newData.status === 'finished') {
           setMatchStatus('finished');
           setWinnerId(newData.winner_id);
@@ -109,14 +104,32 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     return () => { supabase.removeChannel(channel); };
   }
 
-  // 3. ЗАГРУЗКА ЗАДАЧ
-  async function loadProblems(ids: string[]) {
-    if (!ids || ids.length === 0) return;
-    const { data } = await supabase.from('problems').select('*').in('id', ids);
-    // Сортируем в порядке ID
-    const sorted = ids.map(id => data?.find(p => p.id === id)).filter(Boolean);
-    setProblems(sorted);
-  }
+  // 3. HEARTBEAT (Чтобы не ждать афк соперника)
+  useEffect(() => {
+    let interval: any;
+    if (matchStatus === 'active' && duelId && !loading) {
+      interval = setInterval(async () => {
+        const { data: duelInfo } = await supabase.from('duels').select('player1_id').eq('id', duelId).single();
+        if (!duelInfo) return;
+
+        const isP1 = duelInfo.player1_id === user!.id;
+        const updateField = isP1 ? 'player1_last_seen' : 'player2_last_seen';
+        
+        await supabase.from('duels').update({ [updateField]: new Date().toISOString() }).eq('id', duelId);
+
+        const { data } = await supabase.from('duels').select('player1_last_seen, player2_last_seen').eq('id', duelId).single();
+        
+        if (data) {
+          const oppLastSeen = isP1 ? data.player2_last_seen : data.player1_last_seen;
+          if (oppLastSeen && (Date.now() - new Date(oppLastSeen).getTime() > 30000)) {
+            setOpponentDisconnected(true);
+            await supabase.rpc('claim_timeout_win', { duel_uuid: duelId, claimant_uuid: user!.id });
+          }
+        }
+      }, 5000);
+    }
+    return () => clearInterval(interval);
+  }, [matchStatus, duelId, loading]);
 
   // 4. ТАЙМЕР
   useEffect(() => {
@@ -150,20 +163,17 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     setMyScore(newScore);
     const newProgress = currentProbIndex + 1;
 
-    // Отправляем в базу
     const { data: duel } = await supabase.from('duels').select('player1_id').eq('id', duelId).single();
     const isP1 = duel?.player1_id === user!.id;
     const updateData = isP1 
-      ? { player1_score: newScore, player1_progress: newProgress }
-      : { player2_score: newScore, player2_progress: newProgress };
+      ? { player1_score: newScore, player1_progress: newProgress, player1_last_seen: new Date().toISOString() }
+      : { player2_score: newScore, player2_progress: newProgress, player2_last_seen: new Date().toISOString() };
     
-    // Если это последний вопрос
-    const isLastQuestion = newProgress >= problems.length; // Обычно 5 вопросов в турнире
-
     await supabase.from('duels').update(updateData).eq('id', duelId);
     
-    if (isLastQuestion) {
-        // Вызываем финиш (триггер сам решит кто победил и переведет раунд)
+    // ВАЖНО: В турнире финиш вызывает другая функция триггера (advance_tournament_round), 
+    // но finish_duel тоже сработает корректно
+    if (newProgress >= problems.length) {
         await supabase.rpc('finish_duel', { duel_uuid: duelId, finisher_uuid: user!.id });
     }
 
@@ -174,11 +184,27 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     }, 1000);
   }
 
+  // 6. СДАЧА
+  const confirmSurrender = async () => {
+    setShowSurrenderModal(false);
+    if (duelId && user) {
+      await supabase.rpc('surrender_duel', { duel_uuid: duelId, surrendering_uuid: user.id });
+    }
+  };
+
+  async function loadProblems(ids: string[]) {
+    if (!ids || ids.length === 0) return;
+    const { data } = await supabase.from('problems').select('*').in('id', ids);
+    // Сортировка по порядку в массиве ID
+    const sorted = ids.map(id => data?.find(p => p.id === id)).filter(Boolean);
+    setProblems(sorted);
+  }
+
   // === РЕНДЕР ===
 
   if (loading) return <div className="flex h-full items-center justify-center"><Loader className="animate-spin text-cyan-400 w-10 h-10"/></div>;
 
-  // ЭКРАН РЕЗУЛЬТАТА (Ждем следующего раунда)
+  // ЭКРАН РЕЗУЛЬТАТА
   if (matchStatus === 'finished' || currentProbIndex >= problems.length) {
     const isWinner = winnerId === user!.id;
     return (
@@ -188,13 +214,17 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
             <>
               <Trophy className="w-24 h-24 text-yellow-400 mx-auto mb-6" />
               <h1 className="text-4xl font-black text-yellow-400 mb-4">ПОБЕДА!</h1>
-              <p className="text-slate-300 mb-8">Вы проходите в следующий раунд.</p>
+              {opponentDisconnected ? (
+                 <p className="text-emerald-300 mb-8">Соперник отключился.</p>
+              ) : (
+                 <p className="text-slate-300 mb-8">Вы проходите в следующий раунд.</p>
+              )}
             </>
           ) : (
             <>
               <XCircle className="w-24 h-24 text-red-500 mx-auto mb-6" />
               <h1 className="text-4xl font-black text-red-500 mb-4">ВЫБЫВАНИЕ</h1>
-              <p className="text-slate-300 mb-8">Спасибо за участие в турнире.</p>
+              <p className="text-slate-300 mb-8">Хорошая игра. Тренируйтесь в лаборатории!</p>
             </>
           )}
           
@@ -215,6 +245,25 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-8 h-full flex flex-col relative">
       
+      {/* Модалка Сдачи */}
+      {showSurrenderModal && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="flex flex-col items-center text-center mb-6">
+              <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-4">
+                <AlertTriangle className="w-8 h-8 text-red-500" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Сдаться?</h3>
+              <p className="text-slate-400 text-sm">Вам будет засчитано поражение в турнире.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => setShowSurrenderModal(false)} className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold">Отмена</button>
+              <button onClick={confirmSurrender} className="px-4 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold">Сдаться</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Оверлей ответа */}
       {feedback && (
         <div className={`absolute inset-0 z-50 flex items-center justify-center rounded-3xl backdrop-blur-sm ${feedback === 'correct' ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
@@ -225,7 +274,16 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
       )}
 
       {/* Шапка */}
-      <div className="flex items-center justify-between mb-6 bg-slate-900/80 p-4 rounded-xl border border-slate-700">
+      <div className="flex items-center justify-between mb-6 bg-slate-900/80 p-4 rounded-xl border border-slate-700 relative">
+        <button 
+            onClick={() => setShowSurrenderModal(true)}
+            className="absolute -top-12 left-0 md:static md:mr-4 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition-all flex items-center gap-2"
+            title="Сдаться"
+          >
+            <Flag className="w-5 h-5" />
+            <span className="text-xs font-bold hidden md:inline">СДАТЬСЯ</span>
+        </button>
+
         <div className="text-right">
           <div className="text-cyan-400 font-bold text-lg">ВЫ</div>
           <div className="text-3xl font-black text-white">{myScore}</div>
@@ -256,7 +314,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
             )}
             
             <form onSubmit={handleAnswer} className="flex flex-col gap-4">
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <input 
                   autoFocus
                   type="text" 
@@ -269,7 +327,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
                 <button 
                   type="submit" 
                   disabled={!!feedback || userAnswer.trim() === ''}
-                  className="bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 text-white px-8 py-4 rounded-xl font-bold text-xl"
+                  className="w-full sm:w-auto bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 text-white px-8 py-4 rounded-xl font-bold text-xl"
                 >
                   GO
                 </button>
