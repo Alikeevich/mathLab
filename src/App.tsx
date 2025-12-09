@@ -43,11 +43,10 @@ function MainApp() {
 
   const [activeTournamentId, setActiveTournamentId] = useState<string | null>(null);
 
-  // === ФУНКЦИЯ ВХОДА В ТУРНИР (Универсальная) ===
+  // === ФУНКЦИЯ ВХОДА В ТУРНИР ===
   async function joinTournament(code: string) {
     if (!user) return;
     
-    // 1. Ищем турнир по коду
     const { data: tour } = await supabase
       .from('tournaments')
       .select('id, status')
@@ -55,17 +54,14 @@ function MainApp() {
       .single();
 
     if (tour) {
-      // 2. Регистрируемся
       await supabase.from('tournament_participants').upsert({
         tournament_id: tour.id,
         user_id: user.id
       });
       
-      // 3. Чистим URL
       setShowJoinCode(false);
       window.history.replaceState({}, document.title, "/");
       
-      // 4. Переходим в лобби
       setActiveTournamentId(tour.id);
       setView('tournament_lobby');
     } else {
@@ -84,7 +80,7 @@ function MainApp() {
     }
   }, [user]);
 
-  // 2. Авто-реконнект к битве (если вылетел)
+  // 2. Авто-реконнект к битве
   useEffect(() => {
     async function checkActiveDuel() {
       if (!user) return;
@@ -106,20 +102,18 @@ function MainApp() {
   useEffect(() => {
     if (!profile) return;
 
-    // Сначала обычный онбординг
     if (profile.total_experiments === 0 && profile.clearance_level === 0) {
       const hasSeen = localStorage.getItem('onboarding_seen');
       if (!hasSeen) {
         setShowOnboarding(true);
-        return; // Прерываем, чтобы не наслоилось
+        return; 
       }
     }
 
-    // Потом проверка суриката (если еще нет имени)
     if (!profile.companion_name) {
       setShowCompanionSetup(true);
     }
-  }, [profile, showOnboarding]); // Добавил зависимость от showOnboarding
+  }, [profile, showOnboarding]);
 
   function finishOnboarding() {
     localStorage.setItem('onboarding_seen', 'true');
@@ -129,7 +123,7 @@ function MainApp() {
   const currentRank = profile ? getRank(profile.clearance_level, profile.is_admin) : null;
   const progressPercent = profile ? getLevelProgress(profile.total_experiments) : 0;
 
-  // ... (Обработчики навигации) ...
+  // ... Навигация ...
   function handleSectorSelect(sector: Sector) {
     setSelectedSector(sector);
     setView('modules');
@@ -182,26 +176,24 @@ function MainApp() {
 
           <div className="flex items-center gap-3 md:gap-6">
             
-            {/* 1. КНОПКА СУРИКАТА (Перенесена в Header) */}
+            {/* 1. КНОПКА СУРИКАТА (Вернул рамку и стиль кнопки) */}
             {profile?.companion_name && (
               <button 
                 onClick={() => setShowCompanion(true)}
-                // Убрал bg-amber, border и rounded, чтобы не перекрывать твой дизайн
-                className="relative group transition-transform hover:scale-105 mr-2"
+                className="relative group p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-colors mr-2"
                 title={`Домик ${profile.companion_name}`}
               >
+                {/* Картинка теперь внутри, как иконка */}
                 <img 
                   src="/meerkat/avatar.png" 
                   alt="Pet" 
-                  // object-contain: чтобы картинка не обрезалась
-                  // mix-blend-screen: убирает черный фон, если он есть
-                  className="w-10 h-10 object-contain group-hover:scale-110 transition-transform"
+                  className="w-6 h-6 object-cover rounded-sm opacity-90 group-hover:opacity-100 transition-opacity"
                   onError={(e) => { e.currentTarget.style.display='none'; e.currentTarget.parentElement!.innerText = '🦦'; }}
                 />
                 
-                {/* Индикатор голода (немного сдвинул, чтобы был на краю картинки) */}
+                {/* Индикатор голода */}
                 {profile.companion_hunger < 30 && (
-                  <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 border-2 border-slate-900 rounded-full animate-ping" />
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 border-2 border-slate-900 rounded-full animate-ping" />
                 )}
               </button>
             )}
@@ -241,10 +233,7 @@ function MainApp() {
           <>
             <LabMap onSectorSelect={handleSectorSelect} />
             
-            {/* КНОПКИ ГЛАВНОГО ЭКРАНА */}
             <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 flex items-center gap-4 w-full justify-center px-4">
-              
-              {/* Кнопка 1: Войти по коду */}
               <button 
                 onClick={() => setShowJoinCode(true)}
                 className="group flex items-center gap-2 bg-slate-800 border-2 border-slate-600 px-6 py-4 rounded-full shadow-lg hover:border-cyan-400 hover:scale-105 transition-all"
@@ -253,7 +242,6 @@ function MainApp() {
                 <span className="text-lg font-bold text-slate-300 group-hover:text-white uppercase tracking-wider hidden sm:inline">Ввести код</span>
               </button>
 
-              {/* Кнопка 2: PvP Арена (Большая) */}
               <button 
                 onClick={() => setView('pvp')}
                 className="group relative flex items-center gap-3 bg-slate-900 border-2 border-red-600 px-8 py-4 rounded-full shadow-[0_0_30px_rgba(220,38,38,0.4)] hover:shadow-[0_0_50px_rgba(220,38,38,0.6)] hover:scale-105 transition-all overflow-hidden"
@@ -276,7 +264,6 @@ function MainApp() {
           <PvPMode onBack={handleBackToMap} />
         )}
         
-        {/* ЛОББИ ТУРНИРА */}
         {view === 'tournament_lobby' && activeTournamentId && (
           <TournamentLobby 
             tournamentId={activeTournamentId} 
@@ -285,7 +272,6 @@ function MainApp() {
         )}
       </main>
 
-      {/* МОДАЛЬНЫЕ ОКНА */}
       {showCompanionSetup && <CompanionSetup onComplete={() => setShowCompanionSetup(false)} />}
       {showOnboarding && <Onboarding onComplete={finishOnboarding} />}
       {showLeaderboard && <Leaderboard onClose={() => setShowLeaderboard(false)} />}
@@ -296,7 +282,6 @@ function MainApp() {
       {showJoinCode && <JoinTournamentModal onJoin={joinTournament} onClose={() => setShowJoinCode(false)} />}
       {showCompanion && <CompanionLair onClose={() => setShowCompanion(false)} />}
 
-      {/* АДМИНСКИЕ КНОПКИ */}
       {profile?.is_admin && (
         <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
           <button onClick={() => setShowTournamentAdmin(true)} className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-full text-amber-400 hover:bg-amber-500 hover:text-black transition-all shadow-lg">
