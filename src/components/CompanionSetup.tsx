@@ -55,7 +55,6 @@ export function CompanionSetup({ onComplete }: Props) {
               <Sparkles className="w-6 h-6 text-amber-400 animate-spin-slow" />
             </div>
           </div>
-        </div>
 
         <h2 className="text-3xl font-bold text-white mb-4">Это... Сурикат?</h2>
         <p className="text-slate-300 max-w-md mb-8 leading-relaxed">
