@@ -28,8 +28,7 @@ function MainApp() {
   const [view, setView] = useState<View>('map');
   const [selectedSector, setSelectedSector] = useState<Sector | null>(null);
   const [selectedModule, setSelectedModule] = useState<Module | null>(null);
-  
-  // Состояния модальных окон
+  const [showCompanion, setShowCompanion] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
