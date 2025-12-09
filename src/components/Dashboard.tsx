@@ -144,7 +144,7 @@ export function Dashboard({ onClose }: DashboardProps) {
                      <img 
                        src="/meerkat/avatar.png" 
                        alt="Pet" 
-                       className="w-14 h-14 object-contain mix-blend-screen"
+                       className="w-14 h-14 object-contain drop-shadow-md"
                      />
                      <div>
                        <div className="text-[10px] text-amber-400/60 font-mono uppercase tracking-wider">Компаньон</div>
