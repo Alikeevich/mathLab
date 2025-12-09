@@ -266,8 +266,6 @@ function MainApp() {
       {showAdmin && <AdminGenerator onClose={() => setShowAdmin(false)} />}
       {showArchive && <VideoArchive onClose={() => setShowArchive(false)} />}
       {showTournamentAdmin && <TournamentAdmin onClose={() => setShowTournamentAdmin(false)} />}
-      
-      {/* МОДАЛКА ВВОДА КОДА */}
       {showJoinCode && <JoinTournamentModal onJoin={joinTournament} onClose={() => setShowJoinCode(false)} />}
 
       {profile?.is_admin && (
