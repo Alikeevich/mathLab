@@ -38,17 +38,22 @@ export function CompanionSetup({ onComplete }: Props) {
   // 2. Сцена Находки
   if (step === 'found') {
     return (
-      <div className="fixed inset-0 bg-slate-900 z-[100] flex flex-col items-center justify-center p-8 text-center animate-in zoom-in duration-500">
-        <div className="relative mb-8">
-          <div className="absolute -inset-4 bg-amber-500/20 blur-2xl rounded-full" />
-          {/* ЗАМЕНИ SRC НА КАРТИНКУ ВАШЕГО СУРИКАТА */}
-          <div className="w-48 h-48 bg-black rounded-full border-4 border-amber-500 flex items-center justify-center overflow-hidden shadow-2xl relative z-10">
-             <img 
-               src="/meerkat/firsttime.gif" 
-               alt="Сурикат" 
-               // mix-blend-screen уберет черный фон!
-               className="w-full h-full object-cover scale-110" 
-             />
+          <div className="relative mb-8">
+            <div className="absolute -inset-4 bg-amber-500/20 blur-2xl rounded-full" />
+            
+            {/* Круглый контейнер */}
+            <div className="w-48 h-48 bg-slate-900 rounded-full border-4 border-amber-500 flex items-center justify-center overflow-hidden shadow-2xl relative z-10">
+               {/* ЧИСТЫЙ PNG */}
+               <img 
+                 src="/meerkat/idle.png" 
+                 alt="Сурикат" 
+                 className="w-full h-full object-contain p-2" // p-2 чтобы не прилипал к краям
+               />
+            </div>
+            
+            <div className="absolute bottom-0 right-0 bg-slate-900 p-2 rounded-full border border-slate-700 z-20">
+              <Sparkles className="w-6 h-6 text-amber-400 animate-spin-slow" />
+            </div>
           </div>
           
           <div className="absolute bottom-0 right-0 bg-slate-900 p-2 rounded-full border border-slate-700 z-20">
