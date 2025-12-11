@@ -97,7 +97,7 @@ export function CompanionChat({ onClose, problemContext }: Props) {
                 <div className={`max-w-[85%] rounded-2xl p-4 text-sm leading-relaxed shadow-sm ${
                   msg.role === 'me' 
                     ? 'bg-cyan-600 text-white rounded-br-none' 
-                    : 'bg-slate-800/90 border border-slate-700 rounded-bl-none backdrop-blur-sm'
+                    : 'bg-slate-700 text-white border border-slate-600 rounded-bl-none' // <--- ИЗМЕНЕНО: Светлее фон и белый текст
                 }`}>
                   {/* Рендер текста + формул */}
                   {msg.parts.split('\n').map((line, i) => (
