@@ -7,8 +7,8 @@ import { ModuleViewer } from './components/ModuleViewer';
 import { Reactor } from './components/Reactor';
 import { Dashboard } from './components/Dashboard';
 import { Sector, Module } from './lib/supabase';
-// ИКОНКИ
-import { Menu, User, Settings, Trophy, Zap, MonitorPlay, Crown, Keyboard, Lock } from 'lucide-react';
+// ИКОНКИ (Добавил Home)
+import { Menu, User, Settings, Trophy, Zap, MonitorPlay, Crown, Keyboard, Lock, Home } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import 'katex/dist/katex.min.css';
 import { AdminGenerator } from './components/AdminGenerator';
@@ -185,6 +185,7 @@ function MainApp() {
       <header className="relative border-b border-cyan-500/20 bg-slate-900/50 backdrop-blur-sm z-10">
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between gap-4">
           
+          {/* ЛОГОТИП (Теперь клик по нему тоже ведет на главную карту) */}
           <button onClick={handleBackToMap} className="flex items-center gap-3 hover:opacity-80 transition-opacity group min-w-fit">
             <div className="p-2 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-lg group-hover:shadow-lg group-hover:shadow-cyan-500/20 transition-all">
               <Menu className="w-6 h-6 text-white" />
@@ -244,13 +245,24 @@ function MainApp() {
                  </button>
               </>
             ) : (
-              // КНОПКА ВОЙТИ ДЛЯ ГОСТЯ
-              <button 
-                onClick={() => setShowAuthModal(true)}
-                className="px-6 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition-colors shadow-lg shadow-cyan-900/20"
-              >
-                Войти
-              </button>
+              // === КНОПКИ ДЛЯ ГОСТЯ ===
+              <div className="flex gap-3 items-center">
+                {/* КНОПКА ДОМОЙ (ВЫХОД ИЗ ДЕМО) */}
+                <button
+                  onClick={() => setIsGuest(false)}
+                  className="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-slate-400 hover:text-white transition-colors"
+                  title="На главную"
+                >
+                  <Home className="w-5 h-5" />
+                </button>
+                
+                <button 
+                  onClick={() => setShowAuthModal(true)}
+                  className="px-6 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition-colors shadow-lg shadow-cyan-900/20"
+                >
+                  Войти
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -301,10 +313,11 @@ function MainApp() {
           <Reactor 
              module={selectedModule} 
              onBack={handleBackToModules} 
-             onRequestAuth={() => setShowAuthModal(true)} // Передаем функцию вызова окна входа
+             onRequestAuth={() => setShowAuthModal(true)} 
           />
         )}
 
+        {/* PvP и Турниры только для User */}
         {user && view === 'pvp' && (
           <PvPMode onBack={handleBackToMap} />
         )}
@@ -317,7 +330,7 @@ function MainApp() {
         )}
       </main>
 
-      {/* МОДАЛКИ (ТОЛЬКО ЕСЛИ ЮЗЕР) */}
+      {/* МОДАЛКИ (ТОЛЬКО ДЛЯ USER) */}
       {user && (
         <>
           {showCompanionSetup && <CompanionSetup onComplete={() => setShowCompanionSetup(false)} />}
@@ -329,7 +342,7 @@ function MainApp() {
           {showTournamentAdmin && <TournamentAdmin onClose={() => setShowTournamentAdmin(false)} />}
           {showJoinCode && <JoinTournamentModal onJoin={joinTournament} onClose={() => setShowJoinCode(false)} />}
           {showCompanion && <CompanionLair onClose={() => setShowCompanion(false)} />}
-
+          
           {profile?.is_admin && (
             <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
               <button onClick={() => setShowTournamentAdmin(true)} className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-full text-amber-400 hover:bg-amber-500 hover:text-black transition-all shadow-lg backdrop-blur-sm"><Crown className="w-6 h-6" /></button>
