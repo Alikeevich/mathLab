@@ -24,45 +24,69 @@ function normalizeForCalculation(str: string): string {
   s = s.replace(/(\d):(\d)/g, '$1/$2');
 
   // 2. Обработка LaTeX
+  // Корни n-й степени: \sqrt[3]{8} -> nthRoot(8, 3)
   s = s.replace(/\\sqrt\[(\d+)\]\{(.+?)\}/g, 'nthRoot($2, $1)');
+  
+  // Обычные корни
   s = s.replace(/\\sqrt\{(.+?)\}/g, 'sqrt($1)');
   s = s.replace(/\\sqrt/g, 'sqrt');
+
+  // Дроби
   s = s.replace(/\\frac\{(.+?)\}\{(.+?)\}/g, '(($1)/($2))');
-  
-  // Функции
+
+  // Убираем слеши перед функциями
   const funcs = ['sin', 'cos', 'tan', 'cot', 'ln', 'lg', 'log'];
   funcs.forEach(f => {
     s = s.replace(new RegExp(`\\\\${f}`, 'g'), f);
   });
-  s = s.replace(/lg/g, 'log10'); // lg -> log10
-  s = s.replace(/\blog\b/g, 'log10'); // log -> log10 (по умолчанию)
+  
+  // lg -> log10 (школьный стандарт)
+  s = s.replace(/lg/g, 'log10'); 
 
+  // Пи, умножение
   s = s.replace(/\\pi/g, 'pi');
   s = s.replace(/\\cdot/g, '*');
-  
-  // Убираем LaTeX скобки { }
+
+  // Убираем LaTeX скобки { } -> ( )
   s = s.replace(/\{/g, '(').replace(/\}/g, ')');
   s = s.replace(/\\/g, ''); // Остатки слешей
 
-  // 3. Умная расстановка скобок для функций (sin x -> sin(x), sin30 -> sin(30))
-  // Ищем имя функции, за которым НЕТ открывающей скобки, но есть аргумент
-  const funcPattern = /(sin|cos|tan|cot|ln|log10|sqrt)\s*([a-z0-9.]+|pi|infinity)/g;
+  // 3. УМНАЯ РАССТАНОВКА СКОБОК ДЛЯ ФУНКЦИЙ
   
-  // Проходимся дважды, чтобы обработать вложенности если вдруг (хотя регулярка простая)
-  // Мы заменяем "sin 30" на "sin(30)", но не трогаем "sin(30)"
-  // Используем lookahead (?! \() чтобы не дублировать скобки
-  s = s.replace(/(sin|cos|tan|cot|ln|log10|sqrt)\s+(?!\()([a-z0-9.]+|pi|infinity)/g, '$1($2)');
-  // Для слитого написания (sin30 -> sin(30)), исключая cases where next is char (sinx -> sin(x) handled below if x is var)
-  // Но осторожно с переменными. Сделаем для цифр и pi
-  s = s.replace(/(sin|cos|tan|cot|ln|log10|sqrt)(?!\()(\d+(\.\d+)?|pi|infinity)/g, '$1($2)');
+  // log без пробела (log2 -> log10(2))
+  // Ищем log, за которым идет цифра или переменная, но не скобка
+  s = s.replace(/log(?!\()(\d+(\.\d+)?|pi|infinity|[a-z])/g, 'log10($1)');
 
-  // 4. Неявное умножение (Implicit Multiplication)
-  s = s.replace(/\s+/g, ''); // Убираем пробелы финально
+  // Тригонометрия и функции без скобок (sin30 -> sin(30), sinx -> sin(x))
+  // Поддерживаем: sin 30, sin30, sin x, sinx
+  const trigFuncs = 'sin|cos|tan|cot|ln|log10|sqrt';
+  
+  // Сначала обрабатываем с градусами (sin30deg -> sin(30deg))
+  // Нужно вставить пробел перед deg, если его нет, чтобы mathjs понял unit
+  s = s.replace(/(\d)deg/g, '$1 deg');
+
+  // Теперь оборачиваем аргумент в скобки
+  // 1. Если аргумент - число/pi/inf/переменная (одна буква)
+  // Исключаем случай, если уже есть скобка
+  const regexArg = new RegExp(`(${trigFuncs})\\s*(?!\\()(\\d+(\\.\\d+)?( deg)?|pi|infinity|[a-z])`, 'g');
+  s = s.replace(regexArg, '$1($2)');
+
+  // 4. НЕЯВНОЕ УМНОЖЕНИЕ (Implicit Multiplication)
+  
+  s = s.replace(/\s+/g, ''); // Убираем все пробелы (mathjs не нужны пробелы внутри формул)
 
   // Число/Скобка перед Буквой/Функцией/Скобкой
   // 2x -> 2*x, )x -> )*x, 2sin -> 2*sin
   s = s.replace(/(\d|\))(?=[a-z\(]|sqrt|sin|cos|tan|ln|log)/g, '$1*');
   
+  // Между буквами (xy -> x*y), но не внутри имен функций!
+  // Это сложно регуляркой, поэтому mathjs сам часто справляется с xy.
+  // Но для надежности можно добавить, если это точно переменные.
+  // Пока оставим на откуп mathjs, он умный.
+
+  // Если sqrt3 (без скобок) -> sqrt(3) - страховка
+  s = s.replace(/sqrt(\d+(\.\d+)?)/g, 'sqrt($1)');
+
   return s;
 }
 
@@ -76,6 +100,7 @@ function expandOptions(str: string): string[] {
   for (let part of parts) {
     part = part.trim();
     if (!part) continue;
+
     part = part.replace(/\+-/g, '±');
 
     if (part.includes('±')) {
@@ -116,9 +141,8 @@ export function checkAnswer(userAnswer: string, dbAnswer: string): boolean {
       try {
         const norm = normalizeForCalculation(expr);
         const res = evaluate(norm);
-        // Разрешаем Infinity, но не NaN/Complex
         if (typeof res === 'number' && !isNaN(res)) {
-          return res;
+          return res; // Разрешаем Infinity для сравнения
         }
         return NaN;
       } catch (e) {
@@ -149,13 +173,13 @@ export function checkAnswer(userAnswer: string, dbAnswer: string): boolean {
 
       const diff = Math.abs(uVal - dVal);
       
-      // Строгое сравнение для "почти целых" чисел (1000 vs 1001)
+      // Строгое сравнение для "почти целых" чисел
       if (Math.abs(Math.round(uVal) - uVal) < 1e-9 && Math.abs(Math.round(dVal) - dVal) < 1e-9) {
          return Math.abs(Math.round(uVal) - Math.round(dVal)) === 0;
       }
       
-      // Относительная погрешность
-      const tolerance = Math.max(0.05, Math.abs(dVal * 0.001));
+      // Относительная погрешность (Уменьшил для больших чисел)
+      const tolerance = Math.max(0.05, Math.abs(dVal * 1e-6));
       return diff <= tolerance;
     });
 
