@@ -201,9 +201,14 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     }
   };
   async function loadProblems(ids: string[]) {
-    if (!ids || ids.length === 0) return;
+    // ЗАЩИТА: Если ids нет или пустой массив - выходим
+    if (!ids || ids.length === 0) {
+        console.error("Нет задач для этого матча!");
+        return;
+    }
+    
     const { data } = await supabase.from('problems').select('*').in('id', ids);
-    // Сортируем так же, как пришли ID (чтобы у обоих игроков вопросы шли одинаково)
+    // Сортировка по порядку ID
     const sorted = ids.map(id => data?.find(p => p.id === id)).filter(Boolean);
     setProblems(sorted);
   }
