@@ -32,7 +32,7 @@ export function Header({
         <button onClick={onBackToMap} className="flex items-center gap-3 hover:opacity-80 transition-opacity group min-w-fit">
           <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-cyan-500/20 border border-cyan-500/30 bg-slate-800 flex items-center justify-center group-hover:scale-105 transition-transform">
              <img 
-               src="/logo.png" 
+               src="meerkat/logo.png" 
                alt="MathLab" 
                className="w-full h-full object-cover"
                onError={(e) => { 
