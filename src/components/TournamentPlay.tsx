@@ -114,7 +114,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
         const { data } = await supabase.from('duels').select('player1_last_seen, player2_last_seen').eq('id', duelId).single();
         if (data) {
           const oppLastSeen = isP1 ? data.player2_last_seen : data.player1_last_seen;
-          if (oppLastSeen && (Date.now() - new Date(oppLastSeen).getTime() > 30000)) {
+          if (oppLastSeen && (Date.now() - new Date(oppLastSeen).getTime() > 120000)) {
             setOpponentDisconnected(true);
             await supabase.rpc('claim_timeout_win', { duel_uuid: duelId, claimant_uuid: user.id });
           }
