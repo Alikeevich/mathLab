@@ -1,112 +1,145 @@
 import { evaluate } from 'mathjs';
 
-// Функция для превращения любого математического текста в формулу для JS
+/**
+ * Превращает математическую строку (LaTeX или человеческую) в формат, понятный mathjs
+ * Пример: "8\sqrt{3}" -> "8*sqrt(3)"
+ */
 function normalizeForCalculation(str: string): string {
   if (!str) return '';
   let s = str.toLowerCase().trim();
   
-  // 1. Убираем пробелы, они мешают парсингу (кроме случаев типа "x y")
-  // Но для формул типа "8 sqrt 3" лучше убрать пробелы
-  s = s.replace(/\s+/g, '');
+  // 1. Предварительная очистка
+  s = s.replace(/\s+/g, ''); // Убираем пробелы
+  s = s.replace(/,/g, '.');  // Запятые в точки
 
-  // 2. Меняем символы
-  s = s.replace(/,/g, '.');
+  // 2. Замена символов
   s = s.replace(/√/g, 'sqrt');
   s = s.replace(/π/g, 'pi');
   s = s.replace(/°/g, 'deg');
   s = s.replace(/×/g, '*');
   s = s.replace(/⋅/g, '*');
-  s = s.replace(/:/g, '/');
-  
-  // 3. Обработка LaTeX (из базы)
-  // Сначала дроби: \frac{a}{b} -> (a)/(b)
+  s = s.replace(/:/g, '/'); // Двоеточие как деление
+
+  // 3. Обработка LaTeX
+  // Дроби: \frac{a}{b} -> (a)/(b)
   s = s.replace(/\\frac\{(.+?)\}\{(.+?)\}/g, '(($1)/($2))');
-  // Корни с аргументом: \sqrt{3} -> sqrt(3)
+  // Корни: \sqrt{3} -> sqrt(3), \sqrt[3]{8} -> nthRoot(8, 3) (если mathjs поддерживает) или просто sqrt
   s = s.replace(/\\sqrt\{(.+?)\}/g, 'sqrt($1)');
-  // Просто \sqrt -> sqrt (если вдруг без скобок)
   s = s.replace(/\\sqrt/g, 'sqrt');
-  // \pi -> pi
+  // Пи, умножение
   s = s.replace(/\\pi/g, 'pi');
-  // \cdot -> *
   s = s.replace(/\\cdot/g, '*');
-  // Убираем лишние фигурные скобки от LaTeX (например 2^{3} -> 2^3)
+  // Убираем LaTeX скобки { }
   s = s.replace(/\{/g, '(').replace(/\}/g, ')');
-  // Убираем все оставшиеся слеши
+  // Убираем слеши
   s = s.replace(/\\/g, '');
 
-  // 4. ГЛАВНОЕ: Исправление "человеческой" записи (8sqrt3 -> 8*sqrt(3))
+  // 4. Неявное умножение (Implicit Multiplication)
+  // Если цифра стоит перед буквой, скобкой или sqrt (2x, 2(x), 2sqrt) -> 2*...
+  s = s.replace(/(\d)(?=[a-z\(]|sqrt|pi)/g, '$1*');
   
-  // Если после цифры идет буква (2x), скобка (2(x)), или sqrt (2sqrt) — ставим *
-  // Пример: "8sqrt" -> "8*sqrt"
-  s = s.replace(/(\d)(?=[a-z\(]|sqrt)/g, '$1*');
-  
-  // Если после sqrt идет просто число (sqrt3) — оборачиваем число в скобки
-  // Пример: "sqrt3" -> "sqrt(3)", "sqrt25" -> "sqrt(25)"
+  // Если закрывающая скобка перед цифрой/буквой )2 -> )*2
+  s = s.replace(/\)(?=[\d a-z])/g, ')*');
+
+  // Если sqrt3 (без скобок) -> sqrt(3)
   s = s.replace(/sqrt(\d+(\.\d+)?)/g, 'sqrt($1)');
 
-  // Если после pi идет число (pi2) или наоборот (2pi) — мы это уже обработали в шаге 4 (цифра перед буквой)
-  
   return s;
+}
+
+/**
+ * Разворачивает строку с вариантами ответов в массив строк для вычисления.
+ * Обрабатывает ";" (список) и "±" (плюс-минус).
+ * Пример: "2; 5 ± 1" -> ["2", "5+1", "5-1"]
+ */
+function expandOptions(str: string): string[] {
+  // 1. Сначала разбиваем по точке с запятой (независимые ответы)
+  const parts = str.split(';');
+  const results: string[] = [];
+
+  for (let part of parts) {
+    part = part.trim();
+    if (!part) continue;
+
+    // Нормализуем символы +- в ±
+    part = part.replace(/\+-/g, '±');
+
+    // 2. Обрабатываем ±
+    if (part.includes('±')) {
+      // Ищем позицию знака. 
+      // Поддерживаем только один ± на выражение (для ЕНТ этого достаточно)
+      // Пример: "2 ± sqrt(3)"
+      const [left, right] = part.split('±');
+      
+      if (left === '') {
+         // Случай "±5" -> "+5", "-5"
+         results.push(right);
+         results.push(`-${right}`);
+      } else {
+         // Случай "2 ± 3" -> "2 + 3", "2 - 3"
+         results.push(`${left}+(${right})`);
+         results.push(`${left}-(${right})`);
+      }
+    } else {
+      results.push(part);
+    }
+  }
+  return results;
 }
 
 export function checkAnswer(userAnswer: string, dbAnswer: string): boolean {
   if (!userAnswer) return false;
 
-  // === 1. ОБРАБОТКА ± (ПЛЮС-МИНУС) ===
-  function expandPlusMinus(str: string): string[] {
-    const clean = str.replace(/\s+/g, ''); // Удаляем пробелы
-    if (clean.includes('±') || clean.startsWith('+-')) {
-       const val = clean.replace('±', '').replace('+-', '');
-       return [val, `-${val}`];
-    }
-    if (clean.includes(';')) {
-      return clean.split(';');
-    }
-    return [clean];
-  }
-
-  const userOptions = expandPlusMinus(userAnswer);
-  const dbOptions = expandPlusMinus(dbAnswer);
-
-  // === 2. СРАВНЕНИЕ ВАРИАНТОВ ===
   try {
-    const getNumber = (str: string) => {
-      const normalized = normalizeForCalculation(str);
+    // 1. Разворачиваем ответы (превращаем ± в два числа, ; в список)
+    const userExprs = expandOptions(userAnswer);
+    const dbExprs = expandOptions(dbAnswer);
+
+    // Функция для безопасного вычисления
+    const calculate = (expr: string): number => {
       try {
-        const result = evaluate(normalized);
-        // Если результат комплексное число или объект — приводим к строке или NaN, 
-        // но для ЕНТ обычно нужны просто числа.
-        if (typeof result === 'object') return NaN;
-        return result;
+        const norm = normalizeForCalculation(expr);
+        const res = evaluate(norm);
+        // Проверяем, что результат - число (не комплексное, не матрица)
+        if (typeof res === 'number' && !isNaN(res) && isFinite(res)) {
+          return res;
+        }
+        return NaN;
       } catch (e) {
         return NaN;
       }
     };
 
-    const dbValues = dbOptions.map(getNumber).sort((a, b) => a - b);
-    const userValues = userOptions.map(getNumber).sort((a, b) => a - b);
+    // 2. Вычисляем значения
+    const userValues = userExprs.map(calculate).filter(n => !isNaN(n)).sort((a, b) => a - b);
+    const dbValues = dbExprs.map(calculate).filter(n => !isNaN(n)).sort((a, b) => a - b);
 
-    // Если удалось получить числа из обоих ответов
-    if (dbValues.length > 0 && userValues.length > 0 && !dbValues.some(isNaN) && !userValues.some(isNaN)) {
-       if (dbValues.length !== userValues.length) return false;
-       
-       const allMatch = dbValues.every((val, index) => {
-          const uVal = userValues[index];
-          // Погрешность 0.05 для корней и дробей
-          return Math.abs(val - uVal) < 0.05;
-       });
-       
-       if (allMatch) return true;
+    // Если удалось вычислить числа — сравниваем математически
+    if (userValues.length > 0 && dbValues.length > 0) {
+      // Если количество чисел не совпадает — сразу нет (например, уравнение имеет 2 корня, а ввели 1)
+      if (userValues.length !== dbValues.length) return false;
+
+      // Сравниваем каждое число с погрешностью
+      return userValues.every((uVal, i) => {
+        const dVal = dbValues[i];
+        // Относительная погрешность для больших чисел или фикс. 0.05 для малых
+        const tolerance = Math.max(0.05, Math.abs(dVal * 0.001)); 
+        return Math.abs(uVal - dVal) <= tolerance;
+      });
     }
 
-    // === 3. ЗАПАСНОЙ ВАРИАНТ (ТЕКСТОВОЕ СРАВНЕНИЕ) ===
-    // Если mathjs не справился или вернул NaN (например, ответ "x>5"), сравниваем строки
-    return normalizeForCalculation(userAnswer) === normalizeForCalculation(dbAnswer);
+    // 3. Fallback: Текстовое сравнение
+    // Если mathjs не смог посчитать (например "x > 5" или текст), 
+    // нормализуем строки и сравниваем их как текст.
+    const normUser = userExprs.map(normalizeForCalculation).sort().join(';');
+    const normDb = dbExprs.map(normalizeForCalculation).sort().join(';');
+    
+    return normUser === normDb;
 
   } catch (e) {
-    // Совсем всё плохо — просто сравниваем очищенные строки
-    const cleanUser = userAnswer.toLowerCase().replace(/\s+/g, '').replace(/,/g, '.');
-    const cleanDb = dbAnswer.toLowerCase().replace(/\s+/g, '').replace(/,/g, '.');
-    return cleanUser === cleanDb;
+    console.error("Check error:", e);
+    // Самый последний фоллбэк - тупое сравнение очищенных строк
+    const clean = (s: string) => s.toLowerCase().replace(/\s+/g, '').replace(/,/g, '.');
+    return clean(userAnswer) === clean(dbAnswer);
   }
 }
