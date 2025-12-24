@@ -1,26 +1,26 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, Loader, Shield, Swords } from 'lucide-react';
+import { Users, Loader, Shield } from 'lucide-react';
 import { TournamentBracket } from './TournamentBracket';
-import { TournamentPlay } from './TournamentPlay'; // Импортируем нашу новую арену
 
 type LobbyProps = {
   tournamentId: string;
+  onBattleStart: () => void;
 };
 
-export function TournamentLobby({ tournamentId }: LobbyProps) {
+export function TournamentLobby({ tournamentId, onBattleStart }: LobbyProps) {
   const { user } = useAuth();
   const [participants, setParticipants] = useState<any[]>([]);
   const [tournamentCode, setTournamentCode] = useState<string>('');
   const [status, setStatus] = useState<'waiting' | 'active' | 'finished'>('waiting');
   
-  // АКТИВНЫЙ МАТЧ (Если мы деремся прямо сейчас)
   const [activeDuelId, setActiveDuelId] = useState<string | null>(null);
 
   useEffect(() => {
-    // 1. Грузим инфу
     async function loadInfo() {
+      if (!user) return; // Проверка
+
       const { data } = await supabase.from('tournaments').select('*').eq('id', tournamentId).single();
       if (data) {
         setTournamentCode(data.code);
@@ -31,7 +31,6 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
     }
     loadInfo();
 
-    // 2. Realtime подписки
     const tourSub = supabase.channel(`tour-status-${tournamentId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tournaments', filter: `id=eq.${tournamentId}` }, 
       (payload) => setStatus(payload.new.status))
@@ -42,10 +41,9 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
       () => fetchParticipants())
       .subscribe();
 
-    // Подписка на ДУЭЛИ (чтобы узнать, когда начался МОЙ бой)
     const duelSub = supabase.channel(`tour-duels-${tournamentId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'duels', filter: `tournament_id=eq.${tournamentId}` }, 
-      () => checkForActiveDuel()) // При любом изменении дуэлей проверяем, не наша ли очередь
+      () => checkForActiveDuel())
       .subscribe();
 
     return () => {
@@ -53,14 +51,13 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
       supabase.removeChannel(partSub);
       supabase.removeChannel(duelSub);
     };
-  }, [tournamentId]);
+  }, [tournamentId, user]); // Добавили user
 
   async function fetchParticipants() {
     const { data } = await supabase.from('tournament_participants').select('*, profiles(username, mmr)').eq('tournament_id', tournamentId);
     if (data) setParticipants(data);
   }
 
-  // ПРОВЕРКА: ЕСТЬ ЛИ У МЕНЯ АКТИВНЫЙ БОЙ?
   async function checkForActiveDuel() {
     if (!user) return;
     const { data } = await supabase
@@ -69,33 +66,26 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
       .eq('tournament_id', tournamentId)
       .eq('status', 'active')
       .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
-      .maybeSingle(); // Берем один
+      .maybeSingle();
 
     if (data) {
-      setActiveDuelId(data.id); // УРА! БОЙ!
+      setActiveDuelId(data.id);
     } else {
-      setActiveDuelId(null); // Пока ждем
+      setActiveDuelId(null);
     }
   }
 
-  // === РЕЖИМ БОЯ ===
-  if (activeDuelId) {
-    return (
-      <TournamentPlay 
-        duelId={activeDuelId} 
-        onFinished={() => {
-           setActiveDuelId(null); // Бой кончился, возвращаемся в сетку
-           fetchParticipants(); // Обновляем данные
-        }} 
-      />
-    );
+  if (activeDuelId && onBattleStart) {
+      // Здесь мы не рендерим компонент, а вызываем функцию переключения в App.tsx
+      // В твоей архитектуре это делает App.tsx через checkActiveDuel, 
+      // но для надежности можно оставить и тут, если структура изменится.
+      // В текущем варианте App.tsx сам следит за дуэлями.
   }
 
-  // === СЕТКА (ТУРНИР ИДЕТ) ===
+  // Если турнир активен - показываем сетку
   if (status === 'active' || status === 'finished') {
     return (
       <div className="h-full p-4 md:p-8 flex flex-col">
-        {/* Сообщение, если боя нет */}
         {!activeDuelId && status === 'active' && (
            <div className="bg-slate-800 p-4 text-center text-slate-400 mb-4 rounded-xl border border-slate-700 animate-pulse">
              Ожидайте завершения других матчей... Ваш бой скоро появится.
@@ -104,14 +94,13 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
         <div className="flex-1 overflow-hidden">
            <TournamentBracket 
              tournamentId={tournamentId} 
-             onEnterMatch={(dId) => setActiveDuelId(dId)} 
+             onEnterMatch={onBattleStart} 
            />
         </div>
       </div>
     );
   }
 
-  // === ЛОББИ (ОЖИДАНИЕ) ===
   return (
     <div className="flex items-center justify-center h-full p-4">
       <div className="w-full max-w-5xl bg-slate-900/90 border border-cyan-500/30 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
