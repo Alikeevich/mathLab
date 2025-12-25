@@ -7,8 +7,8 @@ import { ModuleViewer } from './components/ModuleViewer';
 import { Reactor } from './components/Reactor';
 import { Dashboard } from './components/Dashboard';
 import { Sector, Module } from './lib/supabase';
-// ИКОНКИ (Только те, что нужны в App)
-import { Settings, Zap, Crown, Keyboard, Lock, RotateCcw } from 'lucide-react';
+// ИКОНКИ
+import { Menu, User, Settings, Trophy, Zap, MonitorPlay, Crown, Keyboard, Lock, Home, RotateCcw } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import 'katex/dist/katex.min.css';
 import { AdminGenerator } from './components/AdminGenerator';
@@ -27,7 +27,7 @@ import { ReconnectModal } from './components/ReconnectModal';
 import { LegalModal } from './components/LegalModal';
 import PixelBlast from './components/PixelBlast';
 
-// Импорт Хедера
+// Импорт Header
 import { Header } from './components/Header';
 
 type View = 'map' | 'modules' | 'reactor' | 'pvp' | 'tournament_lobby';
@@ -85,7 +85,7 @@ function MainApp() {
     } catch (e) { console.error(e); } finally { setIsReconnecting(false); }
   }
 
-  // === ПРОВЕРКИ ПРИ ЗАГРУЗКЕ ===
+  // === ПРОВЕРКИ ===
   useEffect(() => {
     if (!user) return;
     const tCode = new URLSearchParams(window.location.search).get('t');
@@ -109,17 +109,19 @@ function MainApp() {
   };
   const handleReconnectCancel = async () => { setShowReconnect(false); };
 
-  // Авто-админка
+  // АВТО-ОТКРЫТИЕ АДМИНКИ (ЕСЛИ УЧИТЕЛЬ)
   useEffect(() => {
     async function checkHosting() {
-      if (!user || (!profile?.is_admin && profile?.role !== 'teacher')) return;
+      if (!user) return;
+      // Проверяем: админ или учитель
+      if (!profile?.is_admin && profile?.role !== 'teacher') return;
+
       const { data } = await supabase.from('tournaments').select('id').eq('created_by', user.id).in('status', ['waiting', 'active']).maybeSingle();
       if (data) setShowTournamentAdmin(true);
     }
     checkHosting();
   }, [user, profile]);
 
-  // Онбординг
   useEffect(() => {
     if (!profile) return;
     if (profile.total_experiments === 0 && profile.clearance_level === 0) {
@@ -130,9 +132,6 @@ function MainApp() {
   }, [profile, showOnboarding]);
 
   function finishOnboarding() { localStorage.setItem('onboarding_seen', 'true'); setShowOnboarding(false); }
-
-  const currentRank = profile ? getRank(profile.clearance_level, profile.is_admin) : { title: 'Гость', color: 'text-slate-400' };
-  const progressPercent = profile ? getLevelProgress(profile.total_experiments) : 0;
 
   function handleSectorSelect(sector: Sector) { setSelectedSector(sector); setView('modules'); }
   function handleStartExperiment(module: Module) { setSelectedModule(module); setView('reactor'); }
@@ -157,7 +156,6 @@ function MainApp() {
 
   return (
     <div className="min-h-screen bg-slate-900 relative selection:bg-cyan-500/30">
-      
       <div className="absolute inset-0 z-0">
         <PixelBlast variant="circle" pixelSize={6} color="#B19EEF" patternScale={3} patternDensity={1.2} pixelSizeJitter={0.5} enableRipples rippleSpeed={0.4} rippleThickness={0.12} rippleIntensityScale={1.5} liquid liquidStrength={0.12} liquidRadius={1.2} liquidWobbleSpeed={5} speed={0.6} edgeFade={0.25} transparent />
         <div className="absolute inset-0 bg-slate-900/50 pointer-events-none" />
@@ -165,7 +163,7 @@ function MainApp() {
 
       <div className="relative z-10 h-full flex flex-col">
         
-        {/* === HEADER (ТЕПЕРЬ ОТДЕЛЬНО) === */}
+        {/* ХЕДЕР */}
         <Header 
           user={user} 
           profile={profile} 
@@ -182,8 +180,6 @@ function MainApp() {
           {view === 'map' && (
             <>
               <LabMap onSectorSelect={handleSectorSelect} />
-              
-              {/* КНОПКИ ГЛАВНОГО ЭКРАНА */}
               <div className="fixed bottom-6 left-0 right-0 px-4 z-40 flex justify-center gap-3 w-full max-w-lg mx-auto">
                 {user ? (
                    <>
@@ -226,13 +222,17 @@ function MainApp() {
           {showJoinCode && <JoinTournamentModal onJoin={joinTournament} onClose={() => setShowJoinCode(false)} />}
           {showCompanion && <CompanionLair onClose={() => setShowCompanion(false)} />}
           {showReconnect && <ReconnectModal onReconnect={handleReconnectConfirm} onCancel={handleReconnectCancel} />}
-          
           <LevelUpManager />
 
+          {/* КНОПКИ АДМИНА / УЧИТЕЛЯ (Показываем и тем, и другим) */}
           {(profile?.is_admin || profile?.role === 'teacher') && (
             <div className="fixed bottom-28 right-4 z-50 flex flex-col gap-3">
-              <button onClick={() => setShowTournamentAdmin(true)} className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-full text-amber-400 hover:bg-amber-500 hover:text-black transition-all shadow-lg backdrop-blur-sm"><Crown className="w-6 h-6" /></button>
-              {profile?.is_admin && <button onClick={() => setShowAdmin(true)} className="p-3 bg-slate-800/90 border border-cyan-500/30 rounded-full text-cyan-400 shadow-lg backdrop-blur-sm"><Settings className="w-6 h-6" /></button>}
+              <button onClick={() => setShowTournamentAdmin(true)} className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-full text-amber-400 hover:bg-amber-500 hover:text-black transition-all shadow-lg backdrop-blur-sm" title="Турниры"><Crown className="w-6 h-6" /></button>
+              
+              {/* Терминал Архитектора только для Админа */}
+              {profile?.is_admin && (
+                <button onClick={() => setShowAdmin(true)} className="p-3 bg-slate-800/90 border border-cyan-500/30 rounded-full text-cyan-400 shadow-lg backdrop-blur-sm" title="Добавить задачу"><Settings className="w-6 h-6" /></button>
+              )}
             </div>
           )}
         </>
