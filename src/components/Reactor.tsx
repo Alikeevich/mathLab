@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Module } from '../lib/supabase';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { CompanionChat } from './CompanionChat';
 import { MathInput } from './MathInput';
-// MathKeypad больше не нужен! Мы используем встроенный.
+import { MathKeypad } from './MathKeypad';
 
 type Problem = {
   id: string;
@@ -43,8 +43,10 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
   const [loading, setLoading] = useState(true);
   const [showChat, setShowChat] = useState(false);
   
+  // === MATHLIVE ===
   const [userAnswer, setUserAnswer] = useState('');
-  
+  const mfRef = useRef<any>(null); // Реф на поле ввода
+
   const [result, setResult] = useState<'correct' | 'incorrect' | null>(null);
   const [showHint, setShowHint] = useState(false);
   const [startTime, setStartTime] = useState(Date.now());
@@ -54,7 +56,6 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
   const GUEST_LIMIT = 3;
   const [showPaywall, setShowPaywall] = useState(false);
 
-  // === 1. ЗАГРУЗКА ЗАДАЧ ===
   useEffect(() => {
     async function fetchProblems() {
       setLoading(true);
@@ -76,15 +77,12 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
     fetchProblems();
   }, [module.id]);
 
-  // === 2. СМЕНА ЗАДАЧИ ===
   function loadNextProblem() {
     if (!user && problemsSolved >= GUEST_LIMIT) {
       setShowPaywall(true);
       return;
     }
-
     if (problems.length === 0) return;
-    
     const randomProblem = problems[Math.floor(Math.random() * problems.length)];
     
     setCurrentProblem(randomProblem);
@@ -92,12 +90,45 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
     setShowHint(false);
     setStartTime(Date.now());
     
+    // Очистка
     setUserAnswer('');
+    if (mfRef.current) {
+      mfRef.current.setValue('');
+      // Возвращаем фокус
+      setTimeout(() => mfRef.current.focus(), 50);
+    }
   }
 
-  // === 3. ПРОВЕРКА ОТВЕТА ===
+  // === ОБРАБОТЧИКИ КЛАВИАТУРЫ ===
+  const handleKeypadCommand = (cmd: string, arg?: string) => {
+    if (!mfRef.current) {
+        console.error("MathField ref is null!"); 
+        return;
+    }
+    
+    if (cmd === 'insert') {
+      mfRef.current.executeCommand(['insert', arg]);
+    } else if (cmd === 'perform') {
+      mfRef.current.executeCommand([arg]);
+    }
+    mfRef.current.focus();
+  };
+
+  const handleKeypadDelete = () => {
+    if (!mfRef.current) return;
+    mfRef.current.executeCommand(['deleteBackward']);
+    mfRef.current.focus();
+  };
+
+  const handleKeypadClear = () => {
+    if (!mfRef.current) return;
+    mfRef.current.setValue('');
+    setUserAnswer('');
+    mfRef.current.focus();
+  };
+
   async function handleSubmit(e?: React.FormEvent) {
-    if (e) e.preventDefault(); 
+    if (e) e.preventDefault();
     if (!currentProblem) return;
 
     const isCorrect = checkAnswer(userAnswer, currentProblem.answer);
@@ -119,24 +150,13 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
 
       if (isCorrect) {
         setTimeout(() => refreshProfile(), 100);
-        
-        const { data: progressData } = await supabase
-          .from('user_progress')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('module_id', module.id)
-          .maybeSingle();
-          
+        const { data: progressData } = await supabase.from('user_progress').select('*').eq('user_id', user.id).eq('module_id', module.id).maybeSingle();
         const newExperiments = (progressData?.experiments_completed ?? 0) + 1;
         const newPercentage = Math.min(newExperiments * 10, 100);
-
         if (progressData) {
-          await supabase.from('user_progress')
-            .update({ experiments_completed: newExperiments, completion_percentage: newPercentage })
-            .eq('id', progressData.id);
+          await supabase.from('user_progress').update({ experiments_completed: newExperiments, completion_percentage: newPercentage }).eq('id', progressData.id);
         } else {
-          await supabase.from('user_progress')
-            .insert({ user_id: user.id, module_id: module.id, experiments_completed: 1, completion_percentage: 10 });
+          await supabase.from('user_progress').insert({ user_id: user.id, module_id: module.id, experiments_completed: 1, completion_percentage: 10 });
         }
       }
     }
@@ -153,19 +173,14 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
   if (showPaywall) {
     return (
       <div className="flex flex-col h-full items-center justify-center p-8 text-center animate-in zoom-in duration-300">
-        <div className="bg-slate-800 border border-amber-500/30 p-8 rounded-3xl max-w-md shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-500 to-orange-600" />
+        <div className="bg-slate-800 border border-amber-500/30 p-8 rounded-3xl max-w-md shadow-2xl">
           <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-amber-500/50">
             <Lock className="w-10 h-10 text-amber-400" />
           </div>
           <h2 className="text-2xl font-bold text-white mb-3">Демо-режим завершен</h2>
           <p className="text-slate-400 mb-8">Создайте аккаунт, чтобы продолжить.</p>
-          <button onClick={onRequestAuth} className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 text-white font-bold rounded-xl shadow-lg hover:scale-105 transition-all">
-            Создать аккаунт
-          </button>
-          <button onClick={onBack} className="mt-4 text-slate-500 hover:text-white text-sm">
-            Вернуться в меню
-          </button>
+          <button onClick={onRequestAuth} className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold rounded-xl">Создать аккаунт</button>
+          <button onClick={onBack} className="mt-4 text-slate-500 hover:text-white text-sm">Вернуться в меню</button>
         </div>
       </div>
     );
@@ -175,51 +190,18 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
     <div className="w-full h-full overflow-y-auto pb-20 custom-scrollbar">
       <div className="max-w-4xl mx-auto p-4 md:p-8">
         
-        {/* Хедер */}
+        {/* Шапка */}
         <div className="flex justify-between items-center mb-6 md:mb-8">
            <button onClick={onBack} className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition-colors group px-3 py-2 rounded-lg hover:bg-slate-800">
              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
              <span className="font-bold">Назад</span>
            </button>
-           {!user && (
-             <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-amber-400 text-xs font-bold font-mono">
-               ДЕМО: {problemsSolved}/{GUEST_LIMIT}
-             </div>
-           )}
+           {!user && <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-amber-400 text-xs font-bold font-mono">ДЕМО: {problemsSolved}/{GUEST_LIMIT}</div>}
         </div>
 
-        {/* Заголовок и Статистика */}
-        <div className="mb-6 md:mb-8">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="p-2 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg animate-pulse">
-              <Zap className="w-5 h-5 md:w-6 md:h-6 text-white" />
-            </div>
-            <h1 className="text-2xl md:text-3xl font-bold text-white">Реактор</h1>
-          </div>
-          <p className="text-cyan-300/60 font-mono text-xs md:text-sm uppercase tracking-wider pl-1">
-            Модуль: {module.name}
-          </p>
-        </div>
-
-        <div className="grid grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
-          <div className="bg-slate-800/50 backdrop-blur-sm border border-cyan-500/30 rounded-xl p-3 md:p-4">
-            <div className="text-cyan-400/60 text-[10px] md:text-sm mb-1 uppercase">Опытов</div>
-            <div className="text-xl md:text-2xl font-bold text-white">{problemsSolved}</div>
-          </div>
-          <div className="bg-slate-800/50 backdrop-blur-sm border border-emerald-500/30 rounded-xl p-3 md:p-4">
-            <div className="text-emerald-400/60 text-[10px] md:text-sm mb-1 uppercase">Успех</div>
-            <div className="text-xl md:text-2xl font-bold text-white">{correctCount}</div>
-          </div>
-          <div className="bg-slate-800/50 backdrop-blur-sm border border-purple-500/30 rounded-xl p-3 md:p-4">
-            <div className="text-purple-400/60 text-[10px] md:text-sm mb-1 uppercase">КПД</div>
-            <div className="text-xl md:text-2xl font-bold text-white">{successRate}%</div>
-          </div>
-        </div>
-
+        {/* Тело задачи */}
         {currentProblem ? (
           <div className="bg-slate-800/50 backdrop-blur-sm border border-cyan-500/30 rounded-2xl p-4 md:p-8 mb-6 relative overflow-hidden shadow-2xl">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-            
             <div className="flex items-center gap-2 mb-6 relative z-10">
               <Clock className="w-4 h-4 text-cyan-400" />
               <span className="text-cyan-400 font-mono text-xs font-bold">СТАТУС: АКТИВЕН</span>
@@ -236,7 +218,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
               </h2>
             </div>
 
-            {/* ЗОНА РЕШЕНИЯ (ЕСЛИ ЕЩЕ НЕ РЕШЕНО) */}
+            {/* ЗОНА РЕШЕНИЯ */}
             {result === null ? (
               <div className="relative z-10">
                 <div className="mb-4">
@@ -244,74 +226,53 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
                     Ввод решения
                   </label>
                   
-                  {/* === ВВОД ОТВЕТА (Встроенная клавиатура) === */}
+                  {/* === MATHLIVE INPUT === */}
                   <MathInput 
                     value={userAnswer}
                     onChange={setUserAnswer}
                     onSubmit={() => handleSubmit()}
+                    mfRef={mfRef}
                   />
                 </div>
 
-                {/* Наша клавиатура удалена, здесь теперь кнопки действий */}
+                {/* === MATHKEYPAD (ТУТ ОН ЕСТЬ) === */}
+                <MathKeypad 
+                  onCommand={handleKeypadCommand} 
+                  onDelete={handleKeypadDelete}
+                  onClear={handleKeypadClear}
+                  onSubmit={() => handleSubmit()}
+                />
 
-                <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                  <button 
-                    onClick={() => handleSubmit()} 
-                    disabled={!userAnswer.trim()} 
-                    className="flex-1 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    ОТПРАВИТЬ РЕШЕНИЕ
-                  </button>
-
-                  <div className="flex gap-2">
+                <div className="flex justify-end gap-3 pt-4">
                     {user && (
-                      <button type="button" onClick={() => setShowChat(true)} className="px-4 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-xl flex items-center justify-center gap-2 hover:bg-amber-500/20 transition-colors">
+                      <button type="button" onClick={() => setShowChat(true)} className="px-4 py-3 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-xl flex items-center justify-center gap-2 hover:bg-amber-500/20">
                         <MessageSquare className="w-5 h-5" />
-                        <span className="hidden sm:inline font-bold">Сурикат</span>
+                        <span className="hidden sm:inline text-sm font-bold">Сурикат</span>
                       </button>
                     )}
-
                     {!showHint && currentProblem.hint && (
-                      <button type="button" onClick={() => setShowHint(true)} className="px-5 bg-slate-700 hover:bg-slate-600 text-cyan-400 font-bold rounded-xl transition-colors">
-                        ?
-                      </button>
+                      <button type="button" onClick={() => setShowHint(true)} className="px-5 py-3 bg-slate-700 hover:bg-slate-600 text-cyan-400 font-bold rounded-xl">?</button>
                     )}
-                  </div>
                 </div>
                 
                 {showHint && currentProblem.hint && (
-                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mt-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
-                    <AlertCircle className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
-                    <div className="text-blue-300/90 text-sm leading-relaxed"><Latex>{currentProblem.hint}</Latex></div>
+                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mt-4 text-blue-300 text-sm">
+                    <Latex>{currentProblem.hint}</Latex>
                   </div>
                 )}
               </div>
             ) : (
-              // ЗОНА РЕЗУЛЬТАТА
               <div className={`p-6 rounded-2xl border-2 flex items-center gap-4 animate-in zoom-in duration-300 ${result === 'correct' ? 'bg-emerald-500/10 border-emerald-500/50' : 'bg-red-500/10 border-red-500/50'}`}>
-                <div className={`p-3 rounded-full shrink-0 ${result === 'correct' ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
-                  {result === 'correct' ? <CheckCircle2 className="w-8 h-8 text-emerald-400" /> : <XCircle className="w-8 h-8 text-red-400" />}
-                </div>
+                {result === 'correct' ? <CheckCircle2 className="w-8 h-8 text-emerald-400" /> : <XCircle className="w-8 h-8 text-red-400" />}
                 <div>
-                  <div className={`text-xl font-bold ${result === 'correct' ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {result === 'correct' ? 'Верно!' : 'Ошибка'}
-                  </div>
-                  {result === 'incorrect' && (
-                    <div className="text-slate-300 text-sm mt-1">
-                      Ответ: <span className="font-mono font-bold text-white bg-slate-700 px-2 py-0.5 rounded"><Latex>{`$${currentProblem.answer}$`}</Latex></span>
-                    </div>
-                  )}
+                  <div className={`text-xl font-bold ${result === 'correct' ? 'text-emerald-400' : 'text-red-400'}`}>{result === 'correct' ? 'Верно!' : 'Ошибка'}</div>
+                  {result === 'incorrect' && <div className="text-slate-300 text-sm mt-1">Ответ: <span className="font-mono font-bold text-white bg-slate-700 px-2 py-0.5 rounded"><Latex>{`$${currentProblem.answer}$`}</Latex></span></div>}
                 </div>
               </div>
             )}
           </div>
         ) : (
-          <div className="text-center py-20 text-slate-500 border-2 border-dashed border-slate-800 rounded-3xl">
-             <div className="inline-block p-4 bg-slate-800 rounded-full mb-4">
-               <Zap className="w-10 h-10 text-slate-600" />
-             </div>
-             <p>Задачи в этом модуле закончились</p>
-          </div>
+          <div className="text-center py-20 text-slate-500">Задачи закончились</div>
         )}
       </div>
 
