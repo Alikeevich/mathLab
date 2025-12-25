@@ -99,7 +99,7 @@ export function CompanionLair({ onClose }: Props) {
   const getAnimationClass = () => {
     switch (animationState) {
       case 'eating': return 'scale-105';
-      case 'happy': return 'animate-pulse scale-110';
+      case 'happy': return 'scale-110';
       case 'crying': return 'animate-bounce';
       default: return 'hover:scale-105 transition-transform';
     }
