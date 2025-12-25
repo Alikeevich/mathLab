@@ -20,3 +20,4 @@ math-field:focus-within {
 /* Убираем фон выделения, чтобы он был прозрачным или под наш стиль */
 math-field::part(content) {
   padding: 8px 0; /* Чуть отступа */
+}
