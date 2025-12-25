@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Module } from '../lib/supabase';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -14,8 +14,9 @@ import {
   Zap,
   Loader,
   MessageSquare,
-  Lock // Иконка замка
+  Lock
 } from 'lucide-react';
+import { MathInput } from './MathInput';
 import { MathKeypad } from './MathKeypad';
 import { CompanionChat } from './CompanionChat';
 
@@ -42,7 +43,11 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
   const [loading, setLoading] = useState(true);
   const [showChat, setShowChat] = useState(false);
   
+  // userAnswer теперь хранит LaTeX строку из MathQuill
   const [userAnswer, setUserAnswer] = useState('');
+  // Реф для прямого управления MathQuill (чтобы клава работала)
+  const mqRef = useRef<any>(null);
+
   const [result, setResult] = useState<'correct' | 'incorrect' | null>(null);
   const [showHint, setShowHint] = useState(false);
   
@@ -54,14 +59,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
   const GUEST_LIMIT = 3;
   const [showPaywall, setShowPaywall] = useState(false);
 
-  const handleKeyInput = (symbol: string) => {
-    setUserAnswer((prev) => prev + symbol);
-  };
-
-  const handleBackspace = () => {
-    setUserAnswer((prev) => prev.slice(0, -1));
-  };
-
+  // === ЗАГРУЗКА ЗАДАЧ ===
   useEffect(() => {
     async function fetchProblems() {
       setLoading(true);
@@ -83,6 +81,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
     fetchProblems();
   }, [module.id]);
 
+  // === ПЕРЕХОД К СЛЕДУЮЩЕЙ ЗАДАЧЕ ===
   function loadNextProblem() {
     // ЕСЛИ ГОСТЬ И ЛИМИТ ИСЧЕРПАН
     if (!user && problemsSolved >= GUEST_LIMIT) {
@@ -92,22 +91,60 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
 
     if (problems.length === 0) return;
     const randomProblem = problems[Math.floor(Math.random() * problems.length)];
+    
+    // Сброс состояний
     setCurrentProblem(randomProblem);
-    setUserAnswer('');
     setResult(null);
     setShowHint(false);
     setStartTime(Date.now());
+    
+    // Очистка MathQuill
+    setUserAnswer('');
+    if (mqRef.current) {
+      mqRef.current.latex('');
+      // Небольшая задержка для фокуса, чтобы клавиатура на мобилках не прыгала
+      setTimeout(() => mqRef.current.focus(), 50);
+    }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  // === УПРАВЛЕНИЕ ВИРТУАЛЬНОЙ КЛАВИАТУРОЙ ===
+  const handleKeypadCommand = (cmd: string, isWrite: boolean = false) => {
+    if (!mqRef.current) return;
+    
+    if (isWrite) {
+      mqRef.current.write(cmd); // Пишем текст/цифры
+    } else {
+      mqRef.current.cmd(cmd); // Выполняем команду MathQuill (например \frac)
+    }
+    mqRef.current.focus();
+    setUserAnswer(mqRef.current.latex());
+  };
+
+  const handleKeypadDelete = () => {
+    if (!mqRef.current) return;
+    mqRef.current.keystroke('Backspace');
+    setUserAnswer(mqRef.current.latex());
+    mqRef.current.focus();
+  };
+
+  const handleKeypadClear = () => {
+    if (!mqRef.current) return;
+    mqRef.current.latex('');
+    setUserAnswer('');
+    mqRef.current.focus();
+  };
+
+  // === ОТПРАВКА ОТВЕТА ===
+  async function handleSubmit(e?: React.FormEvent) {
+    if (e) e.preventDefault();
     if (!currentProblem) return;
 
-    const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+    // Проверяем ответ (функция checkAnswer теперь умеет парсить LaTeX)
     const isCorrect = checkAnswer(userAnswer, currentProblem.answer);
+    const timeSpent = Math.floor((Date.now() - startTime) / 1000);
 
     setResult(isCorrect ? 'correct' : 'incorrect');
-    setProblemsSolved(prev => prev + 1); // Увеличиваем счетчик сессии
+    setProblemsSolved(prev => prev + 1);
     if (isCorrect) setCorrectCount(prev => prev + 1);
 
     // СОХРАНЯЕМ В БАЗУ ТОЛЬКО ЕСЛИ ЮЗЕР ЗАЛОГИНЕН
@@ -136,6 +173,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
       }
     }
 
+    // Авто-переход через 2 секунды
     setTimeout(() => {
       loadNextProblem();
     }, 2000);
@@ -177,14 +215,14 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
   }
 
   return (
-    <div className="w-full h-full overflow-y-auto pb-20">
-      <div className="max-w-4xl mx-auto p-8">
+    <div className="w-full h-full overflow-y-auto pb-20 custom-scrollbar">
+      <div className="max-w-4xl mx-auto p-4 md:p-8">
         
         {/* Шапка с кнопкой назад и счетчиком демо */}
-        <div className="flex justify-between items-center mb-8">
-           <button onClick={onBack} className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition-colors group">
+        <div className="flex justify-between items-center mb-6 md:mb-8">
+           <button onClick={onBack} className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition-colors group px-3 py-2 rounded-lg hover:bg-slate-800">
              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-             <span>Назад</span>
+             <span className="font-bold">Назад</span>
            </button>
 
            {!user && (
@@ -194,117 +232,141 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
            )}
         </div>
 
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
+        <div className="mb-6 md:mb-8">
+          <div className="flex items-center gap-2 mb-2">
             <div className="p-2 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg animate-pulse">
-              <Zap className="w-6 h-6 text-white" />
+              <Zap className="w-5 h-5 md:w-6 md:h-6 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-white">Реактор</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-white">Реактор</h1>
           </div>
-          <p className="text-cyan-300/60 font-mono text-sm uppercase tracking-wider">
+          <p className="text-cyan-300/60 font-mono text-xs md:text-sm uppercase tracking-wider pl-1">
             Модуль: {module.name}
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          <div className="bg-slate-800/50 backdrop-blur-sm border border-cyan-500/30 rounded-xl p-4">
-            <div className="text-cyan-400/60 text-sm mb-1">Опытов</div>
-            <div className="text-2xl font-bold text-white">{problemsSolved}</div>
+        {/* СТАТИСТИКА */}
+        <div className="grid grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
+          <div className="bg-slate-800/50 backdrop-blur-sm border border-cyan-500/30 rounded-xl p-3 md:p-4">
+            <div className="text-cyan-400/60 text-[10px] md:text-sm mb-1 uppercase">Опытов</div>
+            <div className="text-xl md:text-2xl font-bold text-white">{problemsSolved}</div>
           </div>
-          <div className="bg-slate-800/50 backdrop-blur-sm border border-emerald-500/30 rounded-xl p-4">
-            <div className="text-emerald-400/60 text-sm mb-1">Успех</div>
-            <div className="text-2xl font-bold text-white">{correctCount}</div>
+          <div className="bg-slate-800/50 backdrop-blur-sm border border-emerald-500/30 rounded-xl p-3 md:p-4">
+            <div className="text-emerald-400/60 text-[10px] md:text-sm mb-1 uppercase">Успех</div>
+            <div className="text-xl md:text-2xl font-bold text-white">{correctCount}</div>
           </div>
-          <div className="bg-slate-800/50 backdrop-blur-sm border border-purple-500/30 rounded-xl p-4">
-            <div className="text-purple-400/60 text-sm mb-1">КПД</div>
-            <div className="text-2xl font-bold text-white">{successRate}%</div>
+          <div className="bg-slate-800/50 backdrop-blur-sm border border-purple-500/30 rounded-xl p-3 md:p-4">
+            <div className="text-purple-400/60 text-[10px] md:text-sm mb-1 uppercase">КПД</div>
+            <div className="text-xl md:text-2xl font-bold text-white">{successRate}%</div>
           </div>
         </div>
 
         {currentProblem ? (
-          <div className="bg-slate-800/50 backdrop-blur-sm border border-cyan-500/30 rounded-2xl p-8 mb-6 relative overflow-hidden">
+          <div className="bg-slate-800/50 backdrop-blur-sm border border-cyan-500/30 rounded-2xl p-4 md:p-8 mb-6 relative overflow-hidden shadow-2xl">
             <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
             
             <div className="flex items-center gap-2 mb-6 relative z-10">
-              <Clock className="w-5 h-5 text-cyan-400" />
-              <span className="text-cyan-400 font-mono text-sm">СТАТУС: АКТИВЕН</span>
+              <Clock className="w-4 h-4 text-cyan-400" />
+              <span className="text-cyan-400 font-mono text-xs font-bold">СТАТУС: АКТИВЕН</span>
             </div>
 
             <div className="mb-8 relative z-10">
               {currentProblem.image_url && (
                 <div className="mb-6 flex justify-center">
-                  <img src={currentProblem.image_url} alt="График" className="max-h-64 rounded-lg border border-cyan-500/30 shadow-lg"/>
+                  <img src={currentProblem.image_url} alt="Problem" className="max-h-48 md:max-h-64 rounded-lg border border-cyan-500/30 shadow-lg bg-white/5"/>
                 </div>
               )}
-              <h2 className="text-2xl font-semibold text-white mb-4 leading-relaxed">
+              <h2 className="text-xl md:text-2xl font-semibold text-white mb-4 leading-relaxed">
                 <Latex>{currentProblem.question}</Latex>
               </h2>
             </div>
 
+            {/* ЗОНА РЕШЕНИЯ (ЕСЛИ ЕЩЕ НЕ РЕШЕНО) */}
             {result === null ? (
-              <form onSubmit={handleSubmit} className="space-y-4 relative z-10">
-                <div>
-                  <label className="block text-cyan-300 text-sm font-medium mb-2">Ввод данных</label>
-                  <input
-                    type="text"
+              <div className="relative z-10">
+                <div className="mb-4">
+                  <label className="block text-cyan-300 text-xs font-bold uppercase tracking-wider mb-2">
+                    Поле ввода (MathQuill)
+                  </label>
+                  
+                  {/* === НОВЫЙ ИНПУТ === */}
+                  <MathInput 
                     value={userAnswer}
-                    onChange={(e) => setUserAnswer(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-900/80 border border-cyan-500/30 rounded-lg text-white text-lg focus:outline-none focus:border-cyan-400 font-mono"
-                    placeholder="Ответ..."
-                    autoFocus
+                    onChange={setUserAnswer}
+                    onSubmit={() => handleSubmit()}
+                    mathQuillRef={mqRef}
                   />
                 </div>
 
-                <MathKeypad onKeyPress={handleKeyInput} onBackspace={handleBackspace} />
+                {/* === НОВАЯ КЛАВИАТУРА === */}
+                <MathKeypad 
+                  onCommand={handleKeypadCommand} 
+                  onDelete={handleKeypadDelete}
+                  onClear={handleKeypadClear}
+                />
 
-                <div className="flex gap-3 pt-2">
-                  <button type="submit" disabled={!userAnswer.trim()} className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold py-3 rounded-lg transition-all">
-                    Ответить
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <button 
+                    onClick={() => handleSubmit()} 
+                    disabled={!userAnswer.trim()} 
+                    className="flex-1 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    ОТПРАВИТЬ РЕШЕНИЕ
                   </button>
 
-                  {/* Чат суриката - только для зарегистрированных */}
-                  {user && profile?.companion_name && (
-                    <button type="button" onClick={() => setShowChat(true)} className="px-4 bg-amber-500/10 border border-amber-500/30 text-amber-400 py-3 rounded-lg flex items-center justify-center gap-2">
-                      <MessageSquare className="w-5 h-5" />
-                      <span className="hidden sm:inline">Помощь</span>
-                    </button>
-                  )}
+                  <div className="flex gap-2">
+                    {/* Чат суриката */}
+                    {user && profile?.companion_name && (
+                      <button type="button" onClick={() => setShowChat(true)} className="px-4 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-xl flex items-center justify-center gap-2 hover:bg-amber-500/20 transition-colors">
+                        <MessageSquare className="w-5 h-5" />
+                      </button>
+                    )}
 
-                  {!showHint && currentProblem.hint && (
-                    <button type="button" onClick={() => setShowHint(true)} className="px-6 bg-slate-700/50 hover:bg-slate-700 text-cyan-400 font-medium py-3 rounded-lg">?</button>
-                  )}
+                    {/* Подсказка */}
+                    {!showHint && currentProblem.hint && (
+                      <button type="button" onClick={() => setShowHint(true)} className="px-5 bg-slate-700 hover:bg-slate-600 text-cyan-400 font-bold rounded-xl transition-colors">
+                        ?
+                      </button>
+                    )}
+                  </div>
                 </div>
                 
                 {showHint && currentProblem.hint && (
-                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mt-4 flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-blue-400 shrink-0" />
-                    <div className="text-blue-300/80 text-sm"><Latex>{currentProblem.hint}</Latex></div>
+                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mt-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+                    <AlertCircle className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+                    <div className="text-blue-300/90 text-sm leading-relaxed"><Latex>{currentProblem.hint}</Latex></div>
                   </div>
                 )}
-              </form>
+              </div>
             ) : (
-              <div className={`p-6 rounded-xl border-2 ${result === 'correct' ? 'bg-emerald-500/10 border-emerald-500/50' : 'bg-red-500/10 border-red-500/50'}`}>
-                <div className="flex items-center gap-4">
+              // ЗОНА РЕЗУЛЬТАТА (ПОСЛЕ ОТВЕТА)
+              <div className={`p-6 rounded-2xl border-2 flex items-center gap-4 animate-in zoom-in duration-300 ${result === 'correct' ? 'bg-emerald-500/10 border-emerald-500/50' : 'bg-red-500/10 border-red-500/50'}`}>
+                <div className={`p-3 rounded-full shrink-0 ${result === 'correct' ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
                   {result === 'correct' ? (
-                    <>
-                      <CheckCircle2 className="w-8 h-8 text-emerald-400" />
-                      <div className="text-xl font-bold text-emerald-400">Верно!</div>
-                    </>
+                    <CheckCircle2 className="w-8 h-8 text-emerald-400" />
                   ) : (
-                    <>
-                       <XCircle className="w-8 h-8 text-red-400" />
-                       <div>
-                        <div className="text-xl font-bold text-red-400">Ошибка</div>
-                        <div className="text-red-300/60 text-sm mt-1">Ответ: <span className="font-mono font-bold"><Latex>{`$${currentProblem.answer}$`}</Latex></span></div>
-                       </div>
-                    </>
+                    <XCircle className="w-8 h-8 text-red-400" />
+                  )}
+                </div>
+                <div>
+                  <div className={`text-xl font-bold ${result === 'correct' ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {result === 'correct' ? 'Абсолютно верно!' : 'Ошибка в расчетах'}
+                  </div>
+                  {result === 'incorrect' && (
+                    <div className="text-slate-300 text-sm mt-1">
+                      Правильный ответ: <span className="font-mono font-bold text-white bg-slate-700 px-2 py-0.5 rounded"><Latex>{`$${currentProblem.answer}$`}</Latex></span>
+                    </div>
                   )}
                 </div>
               </div>
             )}
           </div>
         ) : (
-          <div className="text-center py-12 text-slate-500">Нет задач</div>
+          <div className="text-center py-20 text-slate-500 border-2 border-dashed border-slate-800 rounded-3xl">
+             <div className="inline-block p-4 bg-slate-800 rounded-full mb-4">
+               <Zap className="w-10 h-10 text-slate-600" />
+             </div>
+             <p>Задачи в этом модуле закончились</p>
+          </div>
         )}
       </div>
 
