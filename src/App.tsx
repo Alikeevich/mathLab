@@ -8,7 +8,7 @@ import { Reactor } from './components/Reactor';
 import { Dashboard } from './components/Dashboard';
 import { Sector, Module } from './lib/supabase';
 // ИКОНКИ
-import { Menu, User, Settings, Trophy, Zap, MonitorPlay, Crown, Keyboard, Lock, Home, RotateCcw, Shield } from 'lucide-react';
+import { Menu, User, Settings, Trophy, Zap, MonitorPlay, Crown, Keyboard, Lock, Home, Shield } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import 'katex/dist/katex.min.css';
 import { AdminGenerator } from './components/AdminGenerator';
@@ -23,12 +23,11 @@ import { JoinTournamentModal } from './components/JoinTournamentModal';
 import { CompanionLair } from './components/CompanionLair';
 import { CompanionSetup } from './components/CompanionSetup';
 import { LevelUpManager } from './components/LevelUpManager';
-import { ReconnectModal } from './components/ReconnectModal';
+// НОВЫЙ ИМПОРТ
+import { StickyReconnectToast } from './components/StickyReconnectToast';
 import { LegalModal } from './components/LegalModal';
+import { AdminDashboard } from './components/AdminDashboard';
 import PixelBlast from './components/PixelBlast';
-import { AdminDashboard } from './components/AdminDashboard'; // ИМПОРТ
-
-// Импорт Header
 import { Header } from './components/Header';
 
 type View = 'map' | 'modules' | 'reactor' | 'pvp' | 'tournament_lobby';
@@ -51,15 +50,107 @@ function MainApp() {
   const [showJoinCode, setShowJoinCode] = useState(false);
   const [showCompanion, setShowCompanion] = useState(false);
   const [showCompanionSetup, setShowCompanionSetup] = useState(false);
-  const [showReconnect, setShowReconnect] = useState(false);
   const [showLegal, setShowLegal] = useState<'privacy' | 'terms' | null>(null);
-  const [showAdminDashboard, setShowAdminDashboard] = useState(false); // АДМИНКА
+  const [showAdminDashboard, setShowAdminDashboard] = useState(false);
 
-  const [reconnectData, setReconnectData] = useState<{ type: 'tournament' | 'pvp', id?: string } | null>(null);
-  const [isReconnecting, setIsReconnecting] = useState(false);
+  // Реконнект
+  const [reconnectData, setReconnectData] = useState<{ type: 'tournament' | 'pvp', id?: string, duelId?: string } | null>(null);
   const [activeTournamentId, setActiveTournamentId] = useState<string | null>(null);
 
-  // ... (ФУНКЦИИ БЕЗ ИЗМЕНЕНИЙ) ...
+  // === 1. АВТО-ПРОВЕРКА АКТИВНОЙ СЕССИИ ===
+  useEffect(() => {
+    async function checkActiveSession() {
+      if (!user) return;
+
+      // А. Проверяем ТУРНИР (Приоритет)
+      // Ищем участие в активном турнире
+      const { data: part } = await supabase
+        .from('tournament_participants')
+        .select('tournament_id, tournaments(status)')
+        .eq('user_id', user.id)
+        .neq('tournaments.status', 'finished') // Турнир не закончен
+        .maybeSingle();
+
+      if (part && part.tournaments) {
+        // Мы в турнире. Но идет ли сейчас бой?
+        // Проверяем дуэль внутри этого турнира
+        const { data: activeDuel } = await supabase
+          .from('duels')
+          .select('id')
+          .eq('tournament_id', part.tournament_id)
+          .eq('status', 'active')
+          .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
+          .maybeSingle();
+
+        // Если бой идет, или мы просто в лобби активного турнира
+        setReconnectData({ 
+            type: 'tournament', 
+            id: part.tournament_id,
+            duelId: activeDuel?.id 
+        });
+        return;
+      }
+
+      // Б. Проверяем ОБЫЧНОЕ PVP
+      const { data: duel } = await supabase
+        .from('duels')
+        .select('id')
+        .eq('status', 'active')
+        .is('tournament_id', null) 
+        .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
+        .maybeSingle();
+
+      if (duel) {
+        setReconnectData({ type: 'pvp', id: duel.id });
+      }
+    }
+    
+    // Запускаем проверку при загрузке (если мы не в бою уже)
+    if (view === 'map') {
+        checkActiveSession();
+    }
+  }, [user]); // Зависимость только от user, чтобы не спамило
+
+  // === ЛОГИКА РЕКОННЕКТА ===
+  
+  const handleReconnectConfirm = () => {
+    if (!reconnectData) return;
+
+    if (reconnectData.type === 'tournament' && reconnectData.id) {
+      setActiveTournamentId(reconnectData.id);
+      setView('tournament_lobby');
+    } else if (reconnectData.type === 'pvp') {
+      setView('pvp');
+    }
+    setReconnectData(null); // Скрываем тост
+  };
+  
+  const handleReconnectDecline = async () => {
+     if (!user || !reconnectData) return;
+
+     // Если это PvP или Активная дуэль в турнире -> СДАЕМСЯ
+     // Ищем ID дуэли
+     let duelIdToSurrender = reconnectData.duelId;
+
+     if (reconnectData.type === 'pvp') {
+         duelIdToSurrender = reconnectData.id;
+     }
+
+     if (duelIdToSurrender) {
+         console.log("Отказ от боя. Сдаемся:", duelIdToSurrender);
+         await supabase.rpc('surrender_duel', { 
+             duel_uuid: duelIdToSurrender, 
+             surrendering_uuid: user.id 
+         });
+     }
+
+     // Если это просто лобби турнира (без боя), можно удалить участника (опционально)
+     // Но пока просто скрываем окно
+     setReconnectData(null);
+  };
+
+  // ... (Остальные функции без изменений) ...
+
   async function joinTournament(code: string) {
     if (!user) return;
     const { data: tour } = await supabase.from('tournaments').select('id, status').eq('code', code).single();
@@ -74,18 +165,6 @@ function MainApp() {
     }
   }
 
-  async function manualReconnect() {
-    if (!user) return;
-    setIsReconnecting(true);
-    try {
-      const { data: tourPart } = await supabase.from('tournament_participants').select('tournament_id, tournaments(status)').eq('user_id', user.id).neq('tournaments.status', 'finished').maybeSingle();
-      if (tourPart && tourPart.tournaments) { setActiveTournamentId(tourPart.tournament_id); setView('tournament_lobby'); return; }
-      const { data: duel } = await supabase.from('duels').select('id').eq('status', 'active').is('tournament_id', null).or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`).maybeSingle();
-      if (duel) { setView('pvp'); return; }
-      alert("Активных игр не найдено.");
-    } catch (e) { console.error(e); } finally { setIsReconnecting(false); }
-  }
-
   useEffect(() => {
     if (!user) return;
     const tCode = new URLSearchParams(window.location.search).get('t');
@@ -93,26 +172,9 @@ function MainApp() {
   }, [user]);
 
   useEffect(() => {
-    async function checkActiveSession() {
-      if (!user) return;
-      const { data: part } = await supabase.from('tournament_participants').select('tournament_id, tournaments(status)').eq('user_id', user.id).neq('tournaments.status', 'finished').maybeSingle();
-      if (part && part.tournaments) { setReconnectData({ type: 'tournament', id: part.tournament_id }); setShowReconnect(true); return; }
-      const { data: duel } = await supabase.from('duels').select('id').eq('status', 'active').is('tournament_id', null).or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`).maybeSingle();
-      if (duel) setView('pvp');
-    }
-    checkActiveSession();
-  }, [user]);
-
-  const handleReconnectConfirm = () => {
-    if (reconnectData?.type === 'tournament' && reconnectData.id) { setActiveTournamentId(reconnectData.id); setView('tournament_lobby'); }
-    setShowReconnect(false);
-  };
-  const handleReconnectCancel = async () => { setShowReconnect(false); };
-
-  useEffect(() => {
     async function checkHosting() {
       if (!user) return;
-      if (profile?.role !== 'admin' && profile?.role !== 'teacher') return;
+      if (!profile?.is_admin && profile?.role !== 'teacher') return;
       const { data } = await supabase.from('tournaments').select('id').eq('created_by', user.id).in('status', ['waiting', 'active']).maybeSingle();
       if (data) setShowTournamentAdmin(true);
     }
@@ -129,7 +191,8 @@ function MainApp() {
   }, [profile, showOnboarding]);
 
   function finishOnboarding() { localStorage.setItem('onboarding_seen', 'true'); setShowOnboarding(false); }
-
+  const currentRank = profile ? getRank(profile.clearance_level, profile.is_admin) : { title: 'Гость', color: 'text-slate-400' };
+  const progressPercent = profile ? getLevelProgress(profile.total_experiments) : 0;
   function handleSectorSelect(sector: Sector) { setSelectedSector(sector); setView('modules'); }
   function handleStartExperiment(module: Module) { setSelectedModule(module); setView('reactor'); }
   function handleBackToMap() {
@@ -139,16 +202,7 @@ function MainApp() {
   function handleBackToModules() { setView('modules'); setSelectedModule(null); }
 
   if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-cyan-400">Загрузка...</div>;
-
-  if (!user && !isGuest && !showAuthModal) {
-    return (
-      <>
-        <LandingPage onStartDemo={() => setIsGuest(true)} onLogin={() => setShowAuthModal(true)} onOpenLegal={(type) => setShowLegal(type)} />
-        {showLegal && <LegalModal type={showLegal} onClose={() => setShowLegal(null)} />}
-      </>
-    );
-  }
-
+  if (!user && !isGuest && !showAuthModal) return <><LandingPage onStartDemo={() => setIsGuest(true)} onLogin={() => setShowAuthModal(true)} onOpenLegal={(type) => setShowLegal(type)} />{showLegal && <LegalModal type={showLegal} onClose={() => setShowLegal(null)} />}</>;
   if (!user && showAuthModal) return <div className="relative"><button onClick={() => setShowAuthModal(false)} className="absolute top-4 left-4 text-white z-50 p-2 bg-slate-800 rounded-full border border-slate-700">← Назад</button><Auth onOpenLegal={(type) => setShowLegal(type)} />{showLegal && <LegalModal type={showLegal} onClose={() => setShowLegal(null)} />}</div>;
 
   return (
@@ -160,30 +214,17 @@ function MainApp() {
       </div>
 
       <div className="relative z-10 h-full flex flex-col">
-        
-        <Header 
-          user={user} 
-          profile={profile} 
-          onBackToMap={handleBackToMap}
-          onShowCompanion={() => setShowCompanion(true)}
-          onShowArchive={() => setShowArchive(true)}
-          onShowLeaderboard={() => setShowLeaderboard(true)}
-          onShowDashboard={() => setShowDashboard(true)}
-          onExitGuest={() => setIsGuest(false)}
-          onShowAuth={() => setShowAuthModal(true)}
-        />
+        <Header user={user} profile={profile} onBackToMap={handleBackToMap} onShowCompanion={() => setShowCompanion(true)} onShowArchive={() => setShowArchive(true)} onShowLeaderboard={() => setShowLeaderboard(true)} onShowDashboard={() => setShowDashboard(true)} onExitGuest={() => setIsGuest(false)} onShowAuth={() => setShowAuthModal(true)} />
 
         <main className="relative z-0 pb-24 md:pb-20 flex-1">
           {view === 'map' && (
             <>
               <LabMap onSectorSelect={handleSectorSelect} />
               
+              {/* НИЖНИЕ КНОПКИ (Без кнопки перезахода, так как теперь есть Toast) */}
               <div className="fixed bottom-6 left-0 right-0 px-4 z-40 flex justify-center gap-3 w-full max-w-lg mx-auto">
                 {user ? (
                    <>
-                    <button onClick={manualReconnect} disabled={isReconnecting} className="p-3 md:p-4 bg-slate-800/90 backdrop-blur-md border-2 border-slate-600 rounded-2xl shadow-lg hover:border-cyan-400 hover:bg-slate-700 transition-all active:scale-95 disabled:opacity-50" title="Перезаход">
-                      <RotateCcw className={`w-6 h-6 text-slate-300 ${isReconnecting ? 'animate-spin' : ''}`} />
-                    </button>
                     <button onClick={() => setShowJoinCode(true)} className="flex-1 max-w-[160px] group flex items-center justify-center gap-2 bg-slate-800/90 backdrop-blur-md border-2 border-slate-600 px-4 py-3 rounded-2xl shadow-lg active:scale-95 transition-all">
                       <Keyboard className="w-5 h-5 text-slate-400 group-hover:text-cyan-400 transition-colors" /><span className="font-bold text-slate-300 text-sm uppercase hidden sm:inline">Ввести код</span>
                     </button>
@@ -192,9 +233,7 @@ function MainApp() {
                     </button>
                    </>
                 ) : (
-                  <div className="bg-slate-900/90 border border-slate-700 px-6 py-3 rounded-full text-slate-400 text-sm flex items-center gap-2 backdrop-blur-md">
-                     <Lock className="w-4 h-4" /> PvP и Турниры доступны после регистрации
-                  </div>
+                  <div className="bg-slate-900/90 border border-slate-700 px-6 py-3 rounded-full text-slate-400 text-sm flex items-center gap-2 backdrop-blur-md"><Lock className="w-4 h-4" /> PvP и Турниры доступны после регистрации</div>
                 )}
               </div>
             </>
@@ -207,7 +246,6 @@ function MainApp() {
         </main>
       </div>
 
-      {/* МОДАЛКИ */}
       {user && (
         <>
           {showCompanionSetup && <CompanionSetup onComplete={() => setShowCompanionSetup(false)} />}
@@ -219,30 +257,25 @@ function MainApp() {
           {showTournamentAdmin && <TournamentAdmin onClose={() => setShowTournamentAdmin(false)} />}
           {showJoinCode && <JoinTournamentModal onJoin={joinTournament} onClose={() => setShowJoinCode(false)} />}
           {showCompanion && <CompanionLair onClose={() => setShowCompanion(false)} />}
-          {showReconnect && <ReconnectModal onReconnect={handleReconnectConfirm} onCancel={handleReconnectCancel} />}
-          
-          {/* АДМИН ЦЕНТР */}
           {showAdminDashboard && <AdminDashboard onClose={() => setShowAdminDashboard(false)} />}
-          
           <LevelUpManager />
 
-          {/* ПАНЕЛЬ УПРАВЛЕНИЯ */}
+          {/* ЛИПКИЙ РЕКОННЕКТ (Сверху справа) */}
+          {reconnectData && (
+             <StickyReconnectToast 
+               type={reconnectData.type}
+               onReconnect={handleReconnectConfirm}
+               onDecline={handleReconnectDecline}
+             />
+          )}
+
           {(profile?.role === 'admin' || profile?.role === 'teacher') && (
             <div className="fixed bottom-28 right-4 z-50 flex flex-col gap-3">
-              
-              <button onClick={() => setShowTournamentAdmin(true)} className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-full text-amber-400 hover:bg-amber-500 hover:text-black transition-all shadow-lg backdrop-blur-sm" title="Турниры">
-                <Crown className="w-6 h-6" />
-              </button>
-              
-              {/* ТОЛЬКО ДЛЯ АДМИНОВ */}
+              <button onClick={() => setShowTournamentAdmin(true)} className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-full text-amber-400 hover:bg-amber-500 hover:text-black transition-all shadow-lg backdrop-blur-sm"><Crown className="w-6 h-6" /></button>
               {profile?.role === 'admin' && (
                 <>
-                  <button onClick={() => setShowAdmin(true)} className="p-3 bg-slate-800/90 border border-cyan-500/30 rounded-full text-cyan-400 shadow-lg backdrop-blur-sm" title="Задачи">
-                    <Settings className="w-6 h-6" />
-                  </button>
-                  <button onClick={() => setShowAdminDashboard(true)} className="p-3 bg-red-600/20 border border-red-500/50 rounded-full text-red-400 shadow-lg backdrop-blur-sm hover:bg-red-600 hover:text-white" title="Админка">
-                    <Shield className="w-6 h-6" />
-                  </button>
+                  <button onClick={() => setShowAdmin(true)} className="p-3 bg-slate-800/90 border border-cyan-500/30 rounded-full text-cyan-400 shadow-lg backdrop-blur-sm"><Settings className="w-6 h-6" /></button>
+                  <button onClick={() => setShowAdminDashboard(true)} className="p-3 bg-red-600/20 border border-red-500/50 rounded-full text-red-400 shadow-lg backdrop-blur-sm hover:bg-red-600 hover:text-white"><Shield className="w-6 h-6" /></button>
                 </>
               )}
             </div>
@@ -250,14 +283,6 @@ function MainApp() {
         </>
       )}
     </div>
-  );
-}
-
-function App() {
-  return (
-    <AuthProvider>
-      <MainApp />
-    </AuthProvider>
   );
 }
 
