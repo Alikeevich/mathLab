@@ -8,7 +8,7 @@ import { Reactor } from './components/Reactor';
 import { Dashboard } from './components/Dashboard';
 import { Sector, Module } from './lib/supabase';
 // ИКОНКИ
-import { Menu, User, Settings, Trophy, Zap, MonitorPlay, Crown, Keyboard, Lock, Home, RotateCcw, Shield } from 'lucide-react';
+import { Menu, User, Settings, Trophy, Zap, MonitorPlay, Crown, Keyboard, Lock, Home } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import 'katex/dist/katex.min.css';
 import { AdminGenerator } from './components/AdminGenerator';
@@ -23,9 +23,10 @@ import { JoinTournamentModal } from './components/JoinTournamentModal';
 import { CompanionLair } from './components/CompanionLair';
 import { CompanionSetup } from './components/CompanionSetup';
 import { LevelUpManager } from './components/LevelUpManager';
-import { ReconnectModal } from './components/ReconnectModal';
 import { LegalModal } from './components/LegalModal';
-import { AdminDashboard } from './components/AdminDashboard'; // ИМПОРТ
+import { AdminDashboard } from './components/AdminDashboard';
+// НОВЫЙ ИМПОРТ
+import { StickyReconnect } from './components/StickyReconnect';
 import PixelBlast from './components/PixelBlast';
 import { Header } from './components/Header';
 
@@ -47,16 +48,16 @@ function MainApp() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [showTournamentAdmin, setShowTournamentAdmin] = useState(false);
+  const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
   const [showJoinCode, setShowJoinCode] = useState(false);
   const [showCompanion, setShowCompanion] = useState(false);
   const [showCompanionSetup, setShowCompanionSetup] = useState(false);
-  const [showReconnect, setShowReconnect] = useState(false);
   const [showLegal, setShowLegal] = useState<'privacy' | 'terms' | null>(null);
-  const [showAdminDashboard, setShowAdminDashboard] = useState(false); // АДМИНКА
 
-  const [reconnectData, setReconnectData] = useState<{ type: 'tournament' | 'pvp', id?: string } | null>(null);
-  const [isReconnecting, setIsReconnecting] = useState(false);
+  // Состояния восстановления (Sticky Reconnect)
+  const [activeSession, setActiveSession] = useState<{ duelId: string, tournamentId?: string } | null>(null);
+
   const [activeTournamentId, setActiveTournamentId] = useState<string | null>(null);
 
   // === ФУНКЦИЯ ВХОДА В ТУРНИР ===
@@ -70,56 +71,88 @@ function MainApp() {
       setActiveTournamentId(tour.id);
       setView('tournament_lobby');
     } else {
-      alert("Турнир с таким кодом не найден!");
+      alert("Турнир не найден!");
     }
-  }
-
-  // === РУЧНОЙ РЕКОННЕКТ ===
-  async function manualReconnect() {
-    if (!user) return;
-    setIsReconnecting(true);
-    try {
-      const { data: tourPart } = await supabase.from('tournament_participants').select('tournament_id, tournaments(status)').eq('user_id', user.id).neq('tournaments.status', 'finished').maybeSingle();
-      if (tourPart && tourPart.tournaments) { setActiveTournamentId(tourPart.tournament_id); setView('tournament_lobby'); return; }
-      const { data: duel } = await supabase.from('duels').select('id').eq('status', 'active').is('tournament_id', null).or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`).maybeSingle();
-      if (duel) { setView('pvp'); return; }
-      alert("Активных игр не найдено.");
-    } catch (e) { console.error(e); } finally { setIsReconnecting(false); }
   }
 
   // === ПРОВЕРКИ ПРИ ЗАГРУЗКЕ ===
   useEffect(() => {
     if (!user) return;
-    const tCode = new URLSearchParams(window.location.search).get('t');
+    const params = new URLSearchParams(window.location.search);
+    const tCode = params.get('t');
     if (tCode) joinTournament(tCode);
   }, [user]);
 
+  // === АВТОМАТИЧЕСКАЯ ПРОВЕРКА СЕССИИ ===
   useEffect(() => {
     async function checkActiveSession() {
       if (!user) return;
-      const { data: part } = await supabase.from('tournament_participants').select('tournament_id, tournaments(status)').eq('user_id', user.id).neq('tournaments.status', 'finished').maybeSingle();
-      if (part && part.tournaments) { setReconnectData({ type: 'tournament', id: part.tournament_id }); setShowReconnect(true); return; }
-      const { data: duel } = await supabase.from('duels').select('id').eq('status', 'active').is('tournament_id', null).or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`).maybeSingle();
-      if (duel) setView('pvp');
+
+      // 1. Проверяем обычное PVP (Приоритет)
+      const { data: duel } = await supabase
+        .from('duels')
+        .select('id')
+        .eq('status', 'active')
+        .is('tournament_id', null) 
+        .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
+        .maybeSingle();
+
+      if (duel) {
+        // Нашли дуэль! Показываем плашку
+        setActiveSession({ duelId: duel.id });
+        return;
+      }
+
+      // 2. Проверяем участие в ТУРНИРЕ
+      // Если мы в турнире, но не в бою - кидаем в лобби
+      // Если мы в турнире И в бою - кидаем в бой (через лобби)
+      const { data: part } = await supabase
+        .from('tournament_participants')
+        .select('tournament_id, tournaments(status)')
+        .eq('user_id', user.id)
+        .neq('tournaments.status', 'finished') 
+        .maybeSingle();
+
+      if (part && part.tournaments) {
+        // Проверим, есть ли активный бой внутри турнира
+        const { data: tDuel } = await supabase
+           .from('duels')
+           .select('id')
+           .eq('tournament_id', part.tournament_id)
+           .eq('status', 'active')
+           .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
+           .maybeSingle();
+           
+        setActiveSession({ 
+          duelId: tDuel ? tDuel.id : 'lobby', // 'lobby' - метка что мы просто в турнире
+          tournamentId: part.tournament_id 
+        });
+      }
     }
+    
+    // Проверяем при загрузке и при смене юзера
     checkActiveSession();
   }, [user]);
 
+  // Логика кнопки "ВЕРНУТЬСЯ"
   const handleReconnectConfirm = () => {
-    if (reconnectData?.type === 'tournament' && reconnectData.id) { setActiveTournamentId(reconnectData.id); setView('tournament_lobby'); }
-    setShowReconnect(false);
+    if (!activeSession) return;
+    
+    if (activeSession.tournamentId) {
+      setActiveTournamentId(activeSession.tournamentId);
+      setView('tournament_lobby');
+    } else {
+      setView('pvp');
+    }
+    setActiveSession(null); // Скрываем плашку
   };
-  const handleReconnectCancel = async () => { setShowReconnect(false); };
 
-  // АВТО-ОТКРЫТИЕ АДМИНКИ ДЛЯ УЧИТЕЛЕЙ (НО НЕ АДМИНОВ)
+  // Авто-админка
   useEffect(() => {
     async function checkHosting() {
-      if (!user) return;
-      // Если я админ, мне авто-открытие турнирной админки не нужно, я зайду через Shield
-      if (profile?.role === 'teacher' && !profile?.is_admin) {
-         const { data } = await supabase.from('tournaments').select('id').eq('created_by', user.id).in('status', ['waiting', 'active']).maybeSingle();
-         if (data) setShowTournamentAdmin(true);
-      }
+      if (!user || !profile?.is_admin && profile?.role !== 'teacher') return;
+      const { data } = await supabase.from('tournaments').select('id').eq('created_by', user.id).in('status', ['waiting', 'active']).maybeSingle();
+      if (data) setShowTournamentAdmin(true);
     }
     checkHosting();
   }, [user, profile]);
@@ -137,8 +170,9 @@ function MainApp() {
 
   function handleSectorSelect(sector: Sector) { setSelectedSector(sector); setView('modules'); }
   function handleStartExperiment(module: Module) { setSelectedModule(module); setView('reactor'); }
+  
   function handleBackToMap() {
-    if (activeTournamentId && view === 'pvp') { setView('tournament_lobby'); } 
+    if (activeTournamentId && view === 'pvp') setView('tournament_lobby');
     else { setView('map'); setSelectedSector(null); setActiveTournamentId(null); }
   }
   function handleBackToModules() { setView('modules'); setSelectedModule(null); }
@@ -182,17 +216,27 @@ function MainApp() {
           {view === 'map' && (
             <>
               <LabMap onSectorSelect={handleSectorSelect} />
+              
               <div className="fixed bottom-6 left-0 right-0 px-4 z-40 flex justify-center gap-3 w-full max-w-lg mx-auto">
                 {user ? (
                    <>
-                    <button onClick={manualReconnect} disabled={isReconnecting} className="p-3 md:p-4 bg-slate-800/90 backdrop-blur-md border-2 border-slate-600 rounded-2xl shadow-lg hover:border-cyan-400 hover:bg-slate-700 transition-all active:scale-95 disabled:opacity-50" title="Перезаход">
-                      <RotateCcw className={`w-6 h-6 text-slate-300 ${isReconnecting ? 'animate-spin' : ''}`} />
+                    {/* Кнопка 1: Войти по коду */}
+                    <button 
+                      onClick={() => setShowJoinCode(true)}
+                      className="flex-1 max-w-[160px] group flex items-center justify-center gap-2 bg-slate-800/90 backdrop-blur-md border-2 border-slate-600 px-4 py-3 rounded-2xl shadow-lg active:scale-95 transition-all"
+                    >
+                      <Keyboard className="w-5 h-5 text-slate-400 group-hover:text-cyan-400 transition-colors" />
+                      <span className="font-bold text-slate-300 text-sm uppercase hidden sm:inline">Ввести код</span>
                     </button>
-                    <button onClick={() => setShowJoinCode(true)} className="flex-1 max-w-[160px] group flex items-center justify-center gap-2 bg-slate-800/90 backdrop-blur-md border-2 border-slate-600 px-4 py-3 rounded-2xl shadow-lg active:scale-95 transition-all">
-                      <Keyboard className="w-5 h-5 text-slate-400 group-hover:text-cyan-400 transition-colors" /><span className="font-bold text-slate-300 text-sm uppercase hidden sm:inline">Ввести код</span>
-                    </button>
-                    <button onClick={() => setView('pvp')} className="flex-[2] max-w-[240px] group relative flex items-center justify-center gap-2 bg-slate-900/90 backdrop-blur-md border-2 border-red-600 px-6 py-3 rounded-2xl shadow-lg shadow-red-900/20 active:scale-95 transition-all overflow-hidden">
-                      <div className="absolute inset-0 bg-red-600/10 group-hover:bg-red-600/20 transition-colors" /><Zap className="w-8 h-8 text-red-500 fill-current animate-pulse" /><span className="font-black text-white text-lg tracking-widest italic">PVP ARENA</span>
+
+                    {/* Кнопка 2: PvP Арена */}
+                    <button 
+                      onClick={() => setView('pvp')}
+                      className="flex-[2] max-w-[240px] group relative flex items-center justify-center gap-2 bg-slate-900/90 backdrop-blur-md border-2 border-red-600 px-6 py-3 rounded-2xl shadow-lg shadow-red-900/20 active:scale-95 transition-all overflow-hidden"
+                    >
+                      <div className="absolute inset-0 bg-red-600/10 group-hover:bg-red-600/20 transition-colors" />
+                      <Zap className="w-8 h-8 text-red-500 fill-current animate-pulse" />
+                      <span className="font-black text-white text-lg tracking-widest italic">PVP ARENA</span>
                     </button>
                    </>
                 ) : (
@@ -204,16 +248,44 @@ function MainApp() {
             </>
           )}
           
-          {view === 'modules' && selectedSector && <ModuleViewer sector={selectedSector} onBack={handleBackToMap} onStartExperiment={handleStartExperiment} />}
-          {view === 'reactor' && selectedModule && <Reactor module={selectedModule} onBack={handleBackToModules} onRequestAuth={() => setShowAuthModal(true)} />}
-          {user && view === 'pvp' && <PvPMode onBack={handleBackToMap} />}
-          {user && view === 'tournament_lobby' && activeTournamentId && <TournamentLobby tournamentId={activeTournamentId} onBattleStart={() => setView('pvp')} />}
+          {view === 'modules' && selectedSector && (
+            <ModuleViewer sector={selectedSector} onBack={handleBackToMap} onStartExperiment={handleStartExperiment} />
+          )}
+
+          {view === 'reactor' && selectedModule && (
+            <Reactor 
+               module={selectedModule} 
+               onBack={handleBackToModules} 
+               onRequestAuth={() => setShowAuthModal(true)} 
+            />
+          )}
+
+          {user && view === 'pvp' && (
+            <PvPMode onBack={handleBackToMap} />
+          )}
+          
+          {user && view === 'tournament_lobby' && activeTournamentId && (
+            <TournamentLobby 
+              tournamentId={activeTournamentId} 
+              onBattleStart={() => setView('pvp')} 
+            />
+          )}
         </main>
       </div>
 
-      {/* МОДАЛКИ */}
+      {/* --- ВСЕ МОДАЛКИ (Только для User) --- */}
       {user && (
         <>
+          {/* СТИКИ РЕКОННЕКТ (Всплывашка сверху) */}
+          {activeSession && (
+            <StickyReconnect 
+               duelId={activeSession.duelId} 
+               tournamentId={activeSession.tournamentId}
+               onReconnect={handleReconnectConfirm}
+               onDiscard={() => setActiveSession(null)}
+            />
+          )}
+
           {showCompanionSetup && <CompanionSetup onComplete={() => setShowCompanionSetup(false)} />}
           {showOnboarding && <Onboarding onComplete={finishOnboarding} />}
           {showLeaderboard && <Leaderboard onClose={() => setShowLeaderboard(false)} />}
@@ -223,18 +295,14 @@ function MainApp() {
           {showTournamentAdmin && <TournamentAdmin onClose={() => setShowTournamentAdmin(false)} />}
           {showJoinCode && <JoinTournamentModal onJoin={joinTournament} onClose={() => setShowJoinCode(false)} />}
           {showCompanion && <CompanionLair onClose={() => setShowCompanion(false)} />}
-          {showReconnect && <ReconnectModal onReconnect={handleReconnectConfirm} onCancel={handleReconnectCancel} />}
-          
-          {/* МОДАЛКА АДМИН-ЦЕНТРА */}
           {showAdminDashboard && <AdminDashboard onClose={() => setShowAdminDashboard(false)} />}
           
           <LevelUpManager />
 
-          {/* ПАНЕЛЬ УПРАВЛЕНИЯ */}
+          {/* ПАНЕЛЬ УПРАВЛЕНИЯ (Учителя/Админы) */}
           {(profile?.role === 'admin' || profile?.role === 'teacher') && (
             <div className="fixed bottom-28 right-4 z-50 flex flex-col gap-3">
               
-              {/* 1. Кнопка ТУРНИРОВ */}
               <button onClick={() => setShowTournamentAdmin(true)} className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-full text-amber-400 hover:bg-amber-500 hover:text-black transition-all shadow-lg backdrop-blur-sm" title="Турниры">
                 <Crown className="w-6 h-6" />
               </button>
