@@ -7,6 +7,7 @@ declare global {
       'math-field': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
         ref?: any;
         'virtual-keyboard-mode'?: string;
+        inputmode?: string; // Добавили типизацию
       };
     }
   }
@@ -26,11 +27,11 @@ export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
     const mf = internalRef.current;
     if (!mf) return;
 
-    // === ЖЕСТКИЙ БЛОК ВСЕХ ВНЕШНИХ КЛАВИАТУР ===
+    // === НАСТРОЙКИ ===
     mf.smartMode = true; 
-    mf.virtualKeyboardMode = 'manual'; // Отключаем встроенную белую
+    mf.virtualKeyboardMode = 'manual'; // Отключаем встроенную клавиатуру MathLive
     mf.menuItems = []; 
-    mf.keypressSound = null;
+    mf.keypressSound = null; // Без звука
 
     const handleInput = (e: any) => {
       onChange(e.target.value);
@@ -69,11 +70,9 @@ export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
     <div className="w-full bg-slate-900 border border-cyan-500/30 rounded-xl px-4 py-2 shadow-inner min-h-[60px] flex items-center overflow-hidden">
       <math-field
         ref={internalRef}
-        // Этот атрибут + readonly делает так, что на телефоне курсор ставится, 
-        // но клавиатура Gboard/iOS НЕ вылезает. Мы печатаем своими кнопками.
+        // ВАЖНО: Запрещаем системную клавиатуру (iOS/Android), но разрешаем ввод
+        inputmode="none" 
         virtual-keyboard-mode="manual"
-        // @ts-ignore
-        readonly // MathLive в режиме readonly всё равно позволяет программный ввод, но блокирует нативную клаву
         style={{
           width: '100%',
           fontSize: '24px',
