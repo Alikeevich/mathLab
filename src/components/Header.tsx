@@ -23,7 +23,7 @@ export function Header({
   onExitGuest, onShowAuth 
 }: Props) {
 
-  const currentRank = profile ? getRank(profile.clearance_level, profile.is_admin) : { title: 'Гость', color: 'text-slate-400' };
+  const currentRank = profile ? getRank(profile.clearance_level, profile.role) : { title: 'Гость', color: 'text-slate-400' };
   const progressPercent = profile ? getLevelProgress(profile.total_experiments) : 0;
 
   // Логика уведомлений
