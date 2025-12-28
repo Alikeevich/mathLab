@@ -22,61 +22,103 @@ type Props = {
 
 export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
   const internalRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Блокируем автоскролл браузера
+  useEffect(() => {
+    const preventScroll = (e: Event) => {
+      e.preventDefault();
+    };
+    
+    const container = containerRef.current;
+    if (container) {
+      // Блокируем все попытки браузера скроллить
+      container.addEventListener('focus', preventScroll, true);
+      container.addEventListener('focusin', preventScroll, true);
+      
+      return () => {
+        container.removeEventListener('focus', preventScroll, true);
+        container.removeEventListener('focusin', preventScroll, true);
+      };
+    }
+  }, []);
 
   useEffect(() => {
     const mf = internalRef.current;
     if (!mf) return;
 
-    mf.smartMode = true; 
-    mf.virtualKeyboardMode = 'manual'; 
-    mf.menuItems = []; 
+    // Настройки MathLive
+    mf.smartMode = true;
+    mf.virtualKeyboardMode = 'manual';
+    mf.menuItems = [];
     mf.keypressSound = null;
-
+    
+    // КРИТИЧНО: Отключаем автофокус MathLive
+    mf.mathModeSpace = '\\,';
+    
     const handleInput = (e: any) => {
       onChange(e.target.value);
     };
 
-    const handleKeydown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        e.preventDefault(); 
-        onSubmit();
-      }
-    };
-
-    // Блокируем скролл при фокусе
-    const handleFocus = (e: FocusEvent) => {
-      // Logic handled via Reactor, but keeping listener for safety
-    };
-
     mf.addEventListener('input', handleInput);
-    mf.addEventListener('keydown', handleKeydown);
-    mf.addEventListener('focus', handleFocus);
 
-    if (mfRef) mfRef.current = mf;
+    if (mfRef) {
+      mfRef.current = mf;
+    }
 
     if (value !== mf.value) {
       mf.setValue(value);
     }
 
+    // Устанавливаем начальный фокус БЕЗ скролла
+    requestAnimationFrame(() => {
+      if (mf && document.activeElement !== mf) {
+        // Сохраняем текущую позицию скролла
+        const scrollY = window.scrollY;
+        const scrollX = window.scrollX;
+        
+        mf.focus({ preventScroll: true });
+        
+        // Принудительно возвращаем скролл (для iOS)
+        window.scrollTo(scrollX, scrollY);
+      }
+    });
+
     return () => {
       mf.removeEventListener('input', handleInput);
-      mf.removeEventListener('keydown', handleKeydown);
-      mf.removeEventListener('focus', handleFocus);
     };
   }, []);
 
   useEffect(() => {
     const mf = internalRef.current;
-    if (mf && value !== mf.value && document.activeElement !== mf) {
+    if (mf && value !== mf.value) {
+      // Сохраняем позицию курсора
+      const selectionRange = mf.selection;
       mf.setValue(value);
+      // Восстанавливаем курсор
+      try {
+        mf.selection = selectionRange;
+      } catch (e) {
+        // Игнорируем ошибки восстановления курсора
+      }
     }
   }, [value]);
 
   return (
-    <div className="w-full bg-slate-900 border border-cyan-500/30 rounded-xl px-4 py-2 shadow-inner min-h-[60px] flex items-center overflow-hidden">
+    <div 
+      ref={containerRef}
+      className="w-full bg-slate-900 border border-cyan-500/30 rounded-xl px-4 py-2 shadow-inner min-h-[60px] flex items-center overflow-hidden"
+      // Блокируем попытки браузера помочь
+      onTouchMove={(e) => {
+        // Разрешаем скролл только внутри самого поля
+        if (e.target === internalRef.current) {
+          e.stopPropagation();
+        }
+      }}
+    >
       <math-field
         ref={internalRef}
-        inputmode="none" 
+        inputmode="none"
         virtual-keyboard-mode="manual"
         style={{
           width: '100%',
@@ -85,22 +127,20 @@ export function MathInput({ value, onChange, onSubmit, mfRef }: Props) {
           color: 'white',
           border: 'none',
           outline: 'none',
-          touchAction: 'none',
+          touchAction: 'pan-x pan-y',
           
-          // === ВИЗУАЛЬНЫЙ СТИЛЬ ===
+          // Убираем каретку
+          '--caret-color': 'transparent',
           
-          // 1. Курсор (Каретка) - делаем его Cyan, чтобы было видно, где печатаем
-          '--caret-color': '#22d3ee', 
+          // GLASSMORPHISM ВЫДЕЛЕНИЕ 🔥
+          '--selection-background-color': 'rgba(6, 182, 212, 0.25)', // Cyan с прозрачностью
+          '--selection-color': 'white', // Текст остаётся белым
           
-          // 2. ВЫДЕЛЕНИЕ (Стеклянный эффект)
-          // Используем Cyan цвет (34, 211, 238) с прозрачностью 0.3 (30%)
-          '--selection-background-color': 'rgba(34, 211, 238, 0.3)',
+          // Добавляем blur эффект (работает в некоторых браузерах)
+          '--contains-highlight-background-color': 'rgba(6, 182, 212, 0.15)',
           
-          // Цвет текста при выделении оставляем белым (или можно сделать чуть ярче)
-          '--selection-color': '#ffffff',
-          
-          // Фон "пустого квадратика" (placeholder) - делаем едва заметным
-          '--contains-highlight-backgound-color': 'rgba(255, 255, 255, 0.05)',
+          // Подсветка границ выделения
+          '--primary': '#06b6d4', // Cyan для акцентов
         } as any}
       >
         {value}
