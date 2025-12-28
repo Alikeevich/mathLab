@@ -1,17 +1,18 @@
-а тут че то надо?
- 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Latex from 'react-latex-next';
 import { Zap, Loader, Trophy, XCircle, CheckCircle2, Timer, ArrowLeft, Flag, AlertTriangle, WifiOff } from 'lucide-react';
 import { MathKeypad } from './MathKeypad';
+import { MathInput } from './MathInput';
 import { checkAnswer } from '../lib/mathUtils';
 import { RealtimeChannel } from '@supabase/supabase-js';
+
 type Props = {
   duelId: string;
   onFinished: () => void;
 };
+
 export function TournamentPlay({ duelId, onFinished }: Props) {
   const { user } = useAuth();
   // === СОСТОЯНИЯ ===
@@ -22,15 +23,59 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
   const [myScore, setMyScore] = useState(0);
   const [oppScore, setOppScore] = useState(0);
   const [userAnswer, setUserAnswer] = useState('');
+  const mfRef = useRef<any>(null);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [timeLeft, setTimeLeft] = useState(60);
   const [matchStatus, setMatchStatus] = useState<'active' | 'finished'>('active');
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
+
   // === ФУНКЦИИ КЛАВИАТУРЫ ===
-  const handleKeyInput = (s: string) => setUserAnswer(p => p + s);
-  const handleBackspace = () => setUserAnswer(p => p.slice(0, -1));
+  const handleKeypadCommand = (cmd: string, arg?: string) => {
+    if (!mfRef.current) return;
+   
+    // Сохраняем позицию скролла ДО изменения
+    const scrollY = window.scrollY;
+    const scrollX = window.scrollX;
+   
+    if (cmd === 'insert') {
+      mfRef.current.executeCommand(['insert', arg]);
+    } else if (cmd === 'perform') {
+      mfRef.current.executeCommand([arg]);
+    }
+   
+    // Принудительно фиксируем скролл после изменения DOM
+    requestAnimationFrame(() => {
+      window.scrollTo(scrollX, scrollY);
+    });
+  };
+ 
+  const handleKeypadDelete = () => {
+    if (!mfRef.current) return;
+    const scrollY = window.scrollY;
+    const scrollX = window.scrollX;
+   
+    mfRef.current.executeCommand(['deleteBackward']);
+   
+    requestAnimationFrame(() => {
+      window.scrollTo(scrollX, scrollY);
+    });
+  };
+ 
+  const handleKeypadClear = () => {
+    if (!mfRef.current) return;
+    const scrollY = window.scrollY;
+    const scrollX = window.scrollX;
+   
+    mfRef.current.setValue('');
+    setUserAnswer('');
+   
+    requestAnimationFrame(() => {
+      window.scrollTo(scrollX, scrollY);
+    });
+  };
+
   // === 1. ИНИЦИАЛИЗАЦИЯ И ПОДПИСКА ===
   useEffect(() => {
     let channel: RealtimeChannel | null = null;
@@ -102,6 +147,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
       if (channel) supabase.removeChannel(channel);
     };
   }, [duelId, user, onFinished]);
+
   // === 2. HEARTBEAT (Проверка соединения) ===
   useEffect(() => {
     let interval: any;
@@ -129,6 +175,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     }
     return () => clearInterval(interval);
   }, [matchStatus, duelId, loading, user]);
+
   // === 3. ОТПРАВКА ОТВЕТА (SECURE) ===
   const submitResult = useCallback(async (isCorrect: boolean) => {
     if (!user || !duelId) return;
@@ -158,13 +205,21 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
       setFeedback(null);
       setCurrentProbIndex(newProgress);
       setUserAnswer('');
+      if (mfRef.current) {
+        mfRef.current.setValue('');
+        setTimeout(() => {
+          mfRef.current.focus({ preventScroll: true });
+        }, 50);
+      }
     }, 1000);
   }, [duelId, user, myScore, currentProbIndex, problems.length]);
+
   // === 4. ТАЙМЕР ===
   const handleTimeout = useCallback(() => {
     if (feedback) return;
     submitResult(false);
   }, [feedback, submitResult]);
+
   useEffect(() => {
     let timer: any;
     if (matchStatus === 'active' && !feedback && currentProbIndex < problems.length) {
@@ -180,22 +235,35 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     }
     return () => clearInterval(timer);
   }, [matchStatus, feedback, currentProbIndex, problems.length, handleTimeout]);
+
   // Сброс таймера при новом вопросе
   useEffect(() => { setTimeLeft(60); }, [currentProbIndex]);
+
+  // Фокус на ввод при старте матча
+  useEffect(() => {
+    if (!loading && mfRef.current) {
+      setTimeout(() => {
+        mfRef.current.focus({ preventScroll: true });
+      }, 50);
+    }
+  }, [loading]);
+
   // === 5. ОБРАБОТЧИКИ ===
-  const handleAnswer = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAnswer = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (feedback || userAnswer.trim() === '') return;
     const currentProb = problems[currentProbIndex];
     const isCorrect = checkAnswer(userAnswer, currentProb.answer);
     submitResult(isCorrect);
   }
+
   const confirmSurrender = async () => {
     setShowSurrenderModal(false);
     if (duelId && user) {
       await supabase.rpc('surrender_duel', { duel_uuid: duelId, surrendering_uuid: user.id });
     }
   };
+
   async function loadProblems(ids: string[]) {
     // ЗАЩИТА: Если ids нет или пустой массив - выходим
     if (!ids || ids.length === 0) {
@@ -208,8 +276,10 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     const sorted = ids.map(id => data?.find(p => p.id === id)).filter(Boolean);
     setProblems(sorted);
   }
+
   // === РЕНДЕР ===
   if (loading) return <div className="flex h-full items-center justify-center"><Loader className="animate-spin text-cyan-400 w-10 h-10"/></div>;
+
   // ЭКРАН ФИНИША
   if (matchStatus === 'finished' || currentProbIndex >= problems.length) {
     const isWinner = winnerId === user!.id;
@@ -244,6 +314,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
       </div>
     );
   }
+
   const currentProb = problems[currentProbIndex];
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-8 h-full flex flex-col relative">
@@ -317,27 +388,25 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
                   <Latex>{currentProb.question}</Latex>
                 </h2>
               
-                <form onSubmit={handleAnswer} className="flex flex-col gap-4">
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <input
-                       autoFocus
-                       type="text"
-                       value={userAnswer}
-                       onChange={e => setUserAnswer(e.target.value)}
-                       disabled={!!feedback}
-                       className="w-full flex-1 bg-slate-900 border border-slate-600 rounded-xl px-6 py-4 text-xl text-white outline-none focus:border-cyan-500 transition-colors disabled:opacity-50 font-mono"
-                       placeholder="Ваш ответ..."
+                <div className="flex flex-col gap-4">
+                  <div className="mb-4">
+                    <label className="block text-cyan-300 text-xs font-bold uppercase tracking-wider mb-2">
+                      Ввод решения
+                    </label>
+                    <MathInput
+                      value={userAnswer}
+                      onChange={setUserAnswer}
+                      onSubmit={() => handleAnswer()}
+                      mfRef={mfRef}
                     />
-                    <button
-                       type="submit"
-                       disabled={!!feedback || userAnswer.trim() === ''}
-                       className="w-full sm:w-auto bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 text-white px-8 py-4 rounded-xl font-bold text-xl transition-colors disabled:cursor-not-allowed"
-                    >
-                      GO
-                    </button>
                   </div>
-                  <MathKeypad onKeyPress={handleKeyInput} onBackspace={handleBackspace} />
-                </form>
+                  <MathKeypad
+                    onCommand={handleKeypadCommand}
+                    onDelete={handleKeypadDelete}
+                    onClear={handleKeypadClear}
+                    onSubmit={() => handleAnswer()}
+                  />
+                </div>
             </div>
         )}
       </div>
