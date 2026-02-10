@@ -33,9 +33,10 @@ type ReactorProps = {
   module: Module;
   onBack: () => void;
   onRequestAuth?: () => void;
+  forcedProblemIds?: string[] | null; // <--- НОВЫЙ ПРОП: Список конкретных задач
 };
 
-export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
+export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: ReactorProps) {
   const { user, refreshProfile } = useAuth();
   
   const [problems, setProblems] = useState<Problem[]>([]);
@@ -60,8 +61,20 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
     async function fetchProblems() {
       setLoading(true);
       try {
-        const { data } = await supabase.from('problems').select('*').eq('module_id', module.id);
+        let query = supabase.from('problems').select('*');
+
+        // ЕСЛИ ПЕРЕДАН СПИСОК ID (РЕЖИМ РАБОТЫ НАД ОШИБКАМИ)
+        if (forcedProblemIds && forcedProblemIds.length > 0) {
+          query = query.in('id', forcedProblemIds);
+        } else {
+          // ОБЫЧНЫЙ РЕЖИМ (ПО МОДУЛЮ)
+          query = query.eq('module_id', module.id);
+        }
+
+        const { data } = await query;
+
         if (data && data.length > 0) {
+          // Перемешиваем
           const shuffled = data.sort(() => 0.5 - Math.random());
           setProblems(shuffled);
           setCurrentProblem(shuffled[0]);
@@ -71,7 +84,7 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
       }
     }
     fetchProblems();
-  }, [module.id]);
+  }, [module.id, forcedProblemIds]);
 
   // === 2. СМЕНА ЗАДАЧИ ===
   function loadNextProblem() {
@@ -79,9 +92,25 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
       setShowPaywall(true);
       return;
     }
-    if (problems.length === 0) return;
     
-    const randomProblem = problems[Math.floor(Math.random() * problems.length)];
+    // Если это режим работы над ошибками, мы не должны повторять задачи бесконечно,
+    // но в рамках простой реализации оставим рандом из загруженного списка.
+    // Или можно удалять решенную задачу из стейта.
+    
+    // Вариант: Удаляем текущую задачу из списка, если решили правильно (для режима ошибок)
+    let nextProblems = [...problems];
+    if (forcedProblemIds && result === 'correct' && currentProblem) {
+       nextProblems = problems.filter(p => p.id !== currentProblem.id);
+       setProblems(nextProblems);
+    }
+
+    if (nextProblems.length === 0) {
+       // Если задачи кончились
+       setCurrentProblem(null);
+       return;
+    }
+    
+    const randomProblem = nextProblems[Math.floor(Math.random() * nextProblems.length)];
     
     setCurrentProblem(randomProblem);
     setResult(null);
@@ -153,36 +182,49 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
     if (isCorrect) setCorrectCount(prev => prev + 1);
 
     if (user) {
-      // 1. Сохраняем попытку в experiments
+      // 1. Сохраняем попытку в experiments (статистика)
       await supabase.from('experiments').insert({
         user_id: user.id, 
-        module_id: module.id, 
+        module_id: module.id, // В режиме ошибок module.id будет ID виртуального модуля
         problem_id: currentProblem.id, 
         problem_type: currentProblem.type, 
         correct: isCorrect, 
         time_spent: timeSpent,
       });
 
-      // 2. Если ошибка -> сохраняем в user_errors для анализатора (хранится 48 часов)
-      if (!isCorrect) {
-        await supabase.from('user_errors').insert({
-          user_id: user.id,
-          problem_id: currentProblem.id,
-          module_id: module.id,
-          user_answer: userAnswer,
-          correct_answer: currentProblem.answer
-        });
-      }
-
       if (isCorrect) {
+        // === ЛОГИКА ИСПРАВЛЕНИЯ ОШИБКИ ===
+        // Если это режим тренировки ошибок (forcedProblemIds задан), удаляем ошибку из базы
+        if (forcedProblemIds) {
+           await supabase.from('user_errors')
+             .delete()
+             .eq('user_id', user.id)
+             .eq('problem_id', currentProblem.id);
+        }
+
         setTimeout(() => refreshProfile(), 100);
-        const { data: progressData } = await supabase.from('user_progress').select('*').eq('user_id', user.id).eq('module_id', module.id).maybeSingle();
-        const newExperiments = (progressData?.experiments_completed ?? 0) + 1;
-        const newPercentage = Math.min(newExperiments * 10, 100);
-        if (progressData) {
-          await supabase.from('user_progress').update({ experiments_completed: newExperiments, completion_percentage: newPercentage }).eq('id', progressData.id);
-        } else {
-          await supabase.from('user_progress').insert({ user_id: user.id, module_id: module.id, experiments_completed: 1, completion_percentage: 10 });
+        
+        // Обновляем прогресс только в обычном режиме (не в режиме ошибок)
+        if (!forcedProblemIds) {
+            const { data: progressData } = await supabase.from('user_progress').select('*').eq('user_id', user.id).eq('module_id', module.id).maybeSingle();
+            const newExperiments = (progressData?.experiments_completed ?? 0) + 1;
+            const newPercentage = Math.min(newExperiments * 10, 100);
+            if (progressData) {
+              await supabase.from('user_progress').update({ experiments_completed: newExperiments, completion_percentage: newPercentage }).eq('id', progressData.id);
+            } else {
+              await supabase.from('user_progress').insert({ user_id: user.id, module_id: module.id, experiments_completed: 1, completion_percentage: 10 });
+            }
+        }
+      } else {
+        // Если НЕВЕРНО, и это НЕ режим исправления ошибок -> добавляем в ошибки
+        if (!forcedProblemIds) {
+            await supabase.from('user_errors').insert({
+              user_id: user.id,
+              problem_id: currentProblem.id,
+              module_id: module.id,
+              user_answer: userAnswer,
+              correct_answer: currentProblem.answer
+            });
         }
       }
     }
@@ -224,7 +266,9 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
             <div className="p-2 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg animate-pulse">
               <Zap className="w-5 h-5 md:w-6 md:h-6 text-white" />
             </div>
-            <h1 className="text-2xl md:text-3xl font-bold text-white">Реактор</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-white">
+               {forcedProblemIds ? 'Работа над ошибками' : 'Реактор'}
+            </h1>
           </div>
           <p className="text-cyan-300/60 font-mono text-xs md:text-sm uppercase tracking-wider pl-1">
             Модуль: {module.name}
@@ -336,11 +380,15 @@ export function Reactor({ module, onBack, onRequestAuth }: ReactorProps) {
             )}
           </div>
         ) : (
-          <div className="text-center py-20 text-slate-500 border-2 border-dashed border-slate-800 rounded-3xl">
+          <div className="text-center py-20 text-slate-500 border-2 border-dashed border-slate-800 rounded-3xl animate-in fade-in duration-300">
              <div className="inline-block p-4 bg-slate-800 rounded-full mb-4">
                <Zap className="w-10 h-10 text-slate-600" />
              </div>
-             <p>Задачи в этом модуле закончились</p>
+             <h3 className="text-xl font-bold text-white mb-2">Сессия завершена</h3>
+             <p>Задачи закончились.</p>
+             <button onClick={onBack} className="mt-6 px-6 py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-bold">
+               Вернуться
+             </button>
           </div>
         )}
       </div>
