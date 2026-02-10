@@ -18,6 +18,7 @@ import {
 // Типы данных
 type ErrorRecord = {
   id: string;
+  problem_id: string; // Важно для запуска тренировки
   user_answer: string;
   correct_answer: string;
   created_at: string;
@@ -29,7 +30,7 @@ type ErrorRecord = {
   module: {
     id: string;
     name: string;
-    theory_content: string | null; // Теория из модуля
+    theory_content: string | null;
   };
 };
 
@@ -37,12 +38,16 @@ type GroupedErrors = {
   [moduleName: string]: ErrorRecord[];
 };
 
-export function ErrorAnalyzer({ onBack }: { onBack: () => void }) {
+type ErrorAnalyzerProps = {
+  onBack: () => void;
+  onStartTraining: (problemIds: string[]) => void; // Новый проп
+};
+
+export function ErrorAnalyzer({ onBack, onStartTraining }: ErrorAnalyzerProps) {
   const { user } = useAuth();
   const [errors, setErrors] = useState<ErrorRecord[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // ID ошибки, для которой сейчас развернута теория
   const [expandedTheoryId, setExpandedTheoryId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -51,16 +56,15 @@ export function ErrorAnalyzer({ onBack }: { onBack: () => void }) {
 
   async function loadErrors() {
     setLoading(true);
-    // Запрашиваем ошибки + данные задачи + теорию модуля
     const { data } = await supabase
       .from('user_errors')
       .select(`
-        id, user_answer, correct_answer, created_at,
+        id, problem_id, user_answer, correct_answer, created_at,
         problem:problems (id, question, hint),
         module:modules (id, name, theory_content)
       `)
       .eq('user_id', user!.id)
-      .gt('expires_at', new Date().toISOString()) // Только актуальные (48ч)
+      .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false });
 
     if (data) {
@@ -70,7 +74,7 @@ export function ErrorAnalyzer({ onBack }: { onBack: () => void }) {
     setLoading(false);
   }
 
-  // Группировка ошибок по модулям для статистики
+  // Группировка ошибок по модулям
   const groupedErrors: GroupedErrors = errors.reduce((acc, err) => {
     const modName = err.module.name;
     if (!acc[modName]) acc[modName] = [];
@@ -85,6 +89,15 @@ export function ErrorAnalyzer({ onBack }: { onBack: () => void }) {
 
   const toggleTheory = (id: string) => {
     setExpandedTheoryId(prev => prev === id ? null : id);
+  };
+
+  // Функция запуска тренировки
+  const handleStartTraining = () => {
+    // Собираем уникальные ID задач
+    const problemIds = Array.from(new Set(errors.map(e => e.problem_id)));
+    if (problemIds.length > 0) {
+      onStartTraining(problemIds);
+    }
   };
 
   if (loading) return (
@@ -118,7 +131,6 @@ export function ErrorAnalyzer({ onBack }: { onBack: () => void }) {
           
           {/* Сводка (Dashboard) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Статистика по темам */}
             <div className="bg-slate-800/50 border border-slate-700 p-6 rounded-2xl">
               <h3 className="text-slate-400 text-sm uppercase tracking-wider mb-3 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4" /> Проблемные зоны
@@ -143,13 +155,12 @@ export function ErrorAnalyzer({ onBack }: { onBack: () => void }) {
               </div>
             </div>
 
-            {/* Большая кнопка действия */}
             <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 p-6 rounded-2xl flex flex-col justify-center items-center text-center relative overflow-hidden">
               <div className="absolute inset-0 bg-cyan-500/5 pointer-events-none" />
               <div className="text-4xl font-black text-white mb-1 relative z-10">{errors.length}</div>
               <div className="text-slate-400 text-sm mb-4 relative z-10">Ошибок к исправлению</div>
               <button 
-                onClick={() => alert("Функция 'Массовая тренировка' в разработке. Пожалуйста, разберите ошибки вручную ниже.")}
+                onClick={handleStartTraining}
                 className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-transform active:scale-95 shadow-lg shadow-cyan-900/20 relative z-10"
               >
                 <RefreshCcw className="w-5 h-5" />
@@ -164,7 +175,6 @@ export function ErrorAnalyzer({ onBack }: { onBack: () => void }) {
             {errors.map((err) => (
               <div key={err.id} className="bg-slate-800 border border-slate-700 rounded-xl p-5 relative transition-all hover:border-slate-600">
                 
-                {/* Header карточки */}
                 <div className="flex justify-between items-start mb-4">
                   <div className="bg-slate-900 px-3 py-1 rounded-lg text-[10px] text-cyan-400 font-bold font-mono border border-slate-700 uppercase tracking-wide">
                     {err.module.name}
@@ -178,12 +188,10 @@ export function ErrorAnalyzer({ onBack }: { onBack: () => void }) {
                   </button>
                 </div>
 
-                {/* Задача */}
                 <div className="mb-4 text-base md:text-lg text-white font-medium leading-relaxed">
                   <Latex>{err.problem.question}</Latex>
                 </div>
 
-                {/* Сравнение ответов */}
                 <div className="grid grid-cols-2 gap-4 bg-slate-900/50 rounded-lg p-3 border border-slate-700/50 mb-4">
                   <div>
                     <div className="text-[10px] text-red-400/70 uppercase mb-1 font-bold">Ваш ответ</div>
@@ -199,7 +207,6 @@ export function ErrorAnalyzer({ onBack }: { onBack: () => void }) {
                   </div>
                 </div>
 
-                {/* Материалы (Теория) */}
                 <div>
                   <button 
                     onClick={() => toggleTheory(err.id)}
