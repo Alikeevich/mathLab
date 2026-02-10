@@ -37,6 +37,9 @@ function MainApp() {
   const [selectedSector, setSelectedSector] = useState<Sector | null>(null);
   const [selectedModule, setSelectedModule] = useState<Module | null>(null);
   
+  // Состояние для списка задач тренировки
+  const [trainingProblemIds, setTrainingProblemIds] = useState<string[] | null>(null);
+  
   // Состояния доступа
   const [isGuest, setIsGuest] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -95,10 +98,8 @@ function MainApp() {
         .maybeSingle();
 
       if (duel) {
-        // Нашли активную дуэль
         setActiveGameSession({ duelId: duel.id, tournamentId: duel.tournament_id });
       } else {
-        // ВАЖНО: Если дуэли нет (или она finished) — чистим сессию!
         setActiveGameSession(null);
       }
 
@@ -119,7 +120,6 @@ function MainApp() {
     
     checkActiveSession();
     
-    // Подписка на обновления дуэлей
     const channel = supabase
       .channel('global-game-check')
       .on(
@@ -127,14 +127,12 @@ function MainApp() {
         { event: 'UPDATE', schema: 'public', table: 'duels' },
         (payload) => {
           const newData = payload.new;
-          // Если матч завершился и мы в нем участвовали — перепроверяем
           if (
             newData.status === 'finished' &&
             (newData.player1_id === user?.id || newData.player2_id === user?.id)
           ) {
             setActiveGameSession(null);
           } else {
-            // Иначе проверяем заново (вдруг начался новый)
             if (newData.player1_id === user?.id || newData.player2_id === user?.id) {
               checkActiveSession();
             }
@@ -169,7 +167,6 @@ function MainApp() {
   useEffect(() => {
     async function checkHosting() {
       if (!user) return;
-      // Если я админ, мне авто-открытие турнирной админки не нужно
       if (profile?.role === 'teacher' && !profile?.is_admin) {
         const { data } = await supabase
           .from('tournaments')
@@ -184,7 +181,6 @@ function MainApp() {
     checkHosting();
   }, [user, profile]);
 
-  // Проверка onboarding и companion setup
   useEffect(() => {
     if (!profile) return;
     
@@ -214,16 +210,34 @@ function MainApp() {
   function handleStartExperiment(module: Module) {
     setSelectedModule(module);
     setView('reactor');
+    setTrainingProblemIds(null); // Сбрасываем тренировку при обычном запуске
   }
 
   function handleBackToMap() {
     setView('map');
     setSelectedSector(null);
+    setTrainingProblemIds(null);
   }
 
   function handleBackToModules() {
     setView('modules');
     setSelectedModule(null);
+    setTrainingProblemIds(null);
+  }
+
+  // === ЗАПУСК ТРЕНИРОВКИ ОШИБОК ===
+  function handleStartErrorTraining(problemIds: string[]) {
+    setTrainingProblemIds(problemIds);
+    // Создаем фиктивный модуль, так как Reactor требует объект модуля
+    setSelectedModule({
+      id: 'error_training', // Уникальный ID для режима тренировки
+      sector_id: 0,
+      name: 'Работа над ошибками',
+      theory_content: '',
+      order_index: 0,
+      required_modules: []
+    });
+    setView('reactor');
   }
 
   if (loading) {
@@ -383,8 +397,9 @@ function MainApp() {
           {view === 'reactor' && selectedModule && (
             <Reactor
               module={selectedModule}
-              onBack={handleBackToModules}
+              onBack={handleBackToMap}
               onRequestAuth={() => setShowAuthModal(true)}
+              forcedProblemIds={trainingProblemIds}
             />
           )}
 
@@ -400,7 +415,10 @@ function MainApp() {
           )}
 
           {user && view === 'analyzer' && (
-            <ErrorAnalyzer onBack={handleBackToMap} />
+            <ErrorAnalyzer 
+              onBack={handleBackToMap} 
+              onStartTraining={handleStartErrorTraining}
+            />
           )}
         </main>
       </div>
