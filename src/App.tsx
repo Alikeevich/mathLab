@@ -8,7 +8,7 @@ import { Reactor } from './components/Reactor';
 import { Dashboard } from './components/Dashboard';
 import { Sector, Module } from './lib/supabase';
 // ИКОНКИ
-import { Crown, Settings, Shield, Zap, Keyboard, Lock } from 'lucide-react';
+import { Crown, Settings, Shield, Zap, Keyboard, Lock, Brain } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import 'katex/dist/katex.min.css';
 import { AdminGenerator } from './components/AdminGenerator';
@@ -27,8 +27,9 @@ import { AdminDashboard } from './components/AdminDashboard';
 import PixelBlast from './components/PixelBlast';
 import { Header } from './components/Header';
 import { StickyReconnect } from './components/StickyReconnect';
+import { ErrorAnalyzer } from './components/ErrorAnalyzer';
 
-type View = 'map' | 'modules' | 'reactor' | 'pvp' | 'tournament_lobby';
+type View = 'map' | 'modules' | 'reactor' | 'pvp' | 'tournament_lobby' | 'analyzer';
 
 function MainApp() {
   const { user, loading, profile, refreshProfile } = useAuth();
@@ -329,26 +330,37 @@ function MainApp() {
           {view === 'map' && (
             <>
               <LabMap onSectorSelect={handleSectorSelect} />
+              
+              {/* НИЖНЯЯ ПАНЕЛЬ С КНОПКАМИ */}
               <div className="fixed bottom-6 left-0 right-0 px-4 z-40 flex justify-center gap-3 w-full max-w-lg mx-auto">
                 {user ? (
                   <>
                     <button
                       onClick={() => setShowJoinCode(true)}
-                      className="flex-1 max-w-[160px] group flex items-center justify-center gap-2 bg-slate-800/90 backdrop-blur-md border-2 border-slate-600 px-4 py-3 rounded-2xl shadow-lg active:scale-95 transition-all"
+                      className="p-3 bg-slate-800/90 backdrop-blur-md border-2 border-slate-600 rounded-2xl shadow-lg active:scale-95 transition-all"
+                      title="Код турнира"
                     >
-                      <Keyboard className="w-5 h-5 text-slate-400 group-hover:text-cyan-400 transition-colors" />
-                      <span className="font-bold text-slate-300 text-sm uppercase hidden sm:inline">
-                        Ввести код
+                      <Keyboard className="w-5 h-5 text-slate-400 hover:text-cyan-400 transition-colors" />
+                    </button>
+
+                    <button
+                      onClick={() => setView('analyzer')}
+                      className="flex-1 bg-slate-800/90 backdrop-blur-md border-2 border-purple-500/50 rounded-2xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 group"
+                    >
+                      <Brain className="w-5 h-5 text-purple-400 group-hover:text-purple-300 transition-colors" />
+                      <span className="font-bold text-purple-300 text-xs uppercase hidden sm:inline tracking-wider">
+                        Ошибки
                       </span>
                     </button>
+
                     <button
                       onClick={() => setView('pvp')}
-                      className="flex-[2] max-w-[240px] group relative flex items-center justify-center gap-2 bg-slate-900/90 backdrop-blur-md border-2 border-red-600 px-6 py-3 rounded-2xl shadow-lg shadow-red-900/20 active:scale-95 transition-all overflow-hidden"
+                      className="flex-[2] relative flex items-center justify-center gap-2 bg-slate-900/90 backdrop-blur-md border-2 border-red-600 px-4 py-3 rounded-2xl shadow-lg shadow-red-900/20 active:scale-95 transition-all overflow-hidden group"
                     >
                       <div className="absolute inset-0 bg-red-600/10 group-hover:bg-red-600/20 transition-colors" />
-                      <Zap className="w-8 h-8 text-red-500 fill-current animate-pulse" />
-                      <span className="font-black text-white text-lg tracking-widest italic">
-                        PVP ARENA
+                      <Zap className="w-6 h-6 text-red-500 fill-current animate-pulse" />
+                      <span className="font-black text-white text-base tracking-widest italic uppercase">
+                        PVP
                       </span>
                     </button>
                   </>
@@ -387,6 +399,10 @@ function MainApp() {
 
           {user && view === 'tournament_lobby' && activeTournamentId && (
             <TournamentLobby tournamentId={activeTournamentId} />
+          )}
+
+          {user && view === 'analyzer' && (
+            <ErrorAnalyzer onBack={handleBackToMap} />
           )}
         </main>
       </div>
