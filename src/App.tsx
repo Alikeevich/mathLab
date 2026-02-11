@@ -28,6 +28,7 @@ import PixelBlast from './components/PixelBlast';
 import { Header } from './components/Header';
 import { StickyReconnect } from './components/StickyReconnect';
 import { ErrorAnalyzer } from './components/ErrorAnalyzer';
+import { PricingPage } from './components/PricingPage';
 
 type View = 'map' | 'modules' | 'reactor' | 'pvp' | 'tournament_lobby' | 'analyzer';
 
