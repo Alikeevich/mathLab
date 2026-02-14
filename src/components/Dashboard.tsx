@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, Achievement } from '../lib/supabase';
 import {
-  User, LogOut, Trophy, Target, TrendingUp, Award, Zap, Clock, CheckCircle2, XCircle, X, Mail, ShieldCheck
+  User, LogOut, Trophy, Target, TrendingUp, Award, Zap, Clock, CheckCircle2, XCircle, X, Mail, ShieldCheck, GraduationCap, CreditCard, Loader
 } from 'lucide-react';
 import { BecomeTeacherModal } from './BecomeTeacherModal';
 
@@ -40,14 +40,19 @@ const typeTranslations: Record<string, string> = {
 };
 
 export function Dashboard({ onClose }: DashboardProps) {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, refreshProfile } = useAuth();
   const [achievements, setAchievements] = useState<UserAchievement[]>([]);
   const [recentExperiments, setRecentExperiments] = useState<RecentExperiment[]>([]);
   const [showTeacherModal, setShowTeacherModal] = useState(false);
+  
+  // Состояние заявки на учителя
+  const [teacherRequestStatus, setTeacherRequestStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
+  const [loadingRequest, setLoadingRequest] = useState(false);
 
   useEffect(() => {
     loadAchievements();
     loadRecentExperiments();
+    checkTeacherRequest();
   }, []);
 
   async function loadAchievements() {
@@ -81,6 +86,34 @@ export function Dashboard({ onClose }: DashboardProps) {
     }
   }
 
+  // Проверка статуса заявки
+  async function checkTeacherRequest() {
+    if (!profile) return;
+    setLoadingRequest(true);
+    
+    const { data } = await supabase
+      .from('teacher_requests')
+      .select('status')
+      .eq('user_id', profile.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (data) {
+      setTeacherRequestStatus(data.status as any);
+    } else {
+      setTeacherRequestStatus('none');
+    }
+    setLoadingRequest(false);
+  }
+
+  // Обработка оплаты учителя (симуляция или редирект)
+  const handleTeacherPayment = () => {
+    // ТУТ БУДЕТ PADDLE
+    alert("Переход к оплате тарифа Teacher ($9)... (Интеграция Paddle)");
+    // После успешной оплаты Paddle webhook должен обновить profile.role на 'teacher'
+  };
+
   async function handleSignOut() {
     onClose();
     await signOut();
@@ -91,13 +124,81 @@ export function Dashboard({ onClose }: DashboardProps) {
     return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
 
+  // Компонент статуса учителя
+  const TeacherStatusSection = () => {
+    if (profile?.role === 'teacher') {
+      return (
+        <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-cyan-400 cursor-default">
+          <ShieldCheck className="w-4 h-4" />
+          <span>Учитель подтвержден</span>
+        </div>
+      );
+    }
+
+    if (loadingRequest) return null;
+
+    if (teacherRequestStatus === 'pending') {
+      return (
+        <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-400 cursor-help" title="Администратор проверяет ваши документы">
+          <Clock className="w-4 h-4" />
+          <span>Заявка на проверке</span>
+        </div>
+      );
+    }
+
+    if (teacherRequestStatus === 'approved') {
+      return (
+        <button
+          onClick={handleTeacherPayment}
+          className="hidden md:flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400/30 rounded-lg transition-colors shadow-lg shadow-emerald-900/20 animate-pulse"
+        >
+          <CreditCard className="w-4 h-4" />
+          <span>Оплатить тариф Teacher</span>
+        </button>
+      );
+    }
+
+    // Если заявки нет или отклонена
+    if (!profile?.is_admin) {
+      return (
+        <button
+          onClick={() => setShowTeacherModal(true)}
+          className="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-700/50 hover:bg-slate-700 text-slate-300 border border-slate-600 rounded-lg transition-colors"
+        >
+          <GraduationCap className="w-4 h-4" />
+          <span>Стать учителем</span>
+        </button>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-sm z-[70] overflow-y-auto">
       <div className="max-w-6xl mx-auto p-4 md:p-8">
         
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 md:mb-8 gap-4">
           <div className="flex justify-between items-center">
-            <h1 className="text-2xl md:text-3xl font-bold text-white">Лабораторный Журнал</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl md:text-3xl font-bold text-white">Профиль</h1>
+              
+              {/* БЕЙДЖИ СТАТУСА (PREMIUM / TEACHER) */}
+              {profile?.is_premium && profile.role !== 'teacher' && (
+                <div className="px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full flex items-center gap-1.5 shadow-lg shadow-amber-900/20">
+                  <Zap className="w-3.5 h-3.5 text-white fill-current" />
+                  <span className="text-xs font-black text-white uppercase tracking-wider">Premium</span>
+                </div>
+              )}
+              
+              {profile?.role === 'teacher' && (
+                <div className="px-3 py-1 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full flex items-center gap-1.5 shadow-lg shadow-cyan-900/20">
+                  <GraduationCap className="w-4 h-4 text-white" />
+                  <span className="text-xs font-black text-white uppercase tracking-wider">Teacher</span>
+                </div>
+              )}
+            </div>
+
             <button onClick={onClose} className="md:hidden p-2 text-slate-400 hover:text-white">
               <X className="w-6 h-6" />
             </button>
@@ -105,16 +206,8 @@ export function Dashboard({ onClose }: DashboardProps) {
 
           <div className="flex gap-3">
             
-            {/* КНОПКА "Я УЧИТЕЛЬ" */}
-            {profile && profile.role !== 'teacher' && !profile.is_admin && (
-              <button
-                onClick={() => setShowTeacherModal(true)}
-                className="hidden md:flex items-center gap-2 px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg transition-colors"
-              >
-                <ShieldCheck className="w-4 h-4" />
-                <span>Я учитель</span>
-              </button>
-            )}
+            {/* УМНАЯ КНОПКА УЧИТЕЛЯ (Десктоп) */}
+            <TeacherStatusSection />
 
             <button
               onClick={onClose}
@@ -131,16 +224,35 @@ export function Dashboard({ onClose }: DashboardProps) {
             </button>
           </div>
           
-          {/* Мобильная кнопка учителя */}
-          {profile && profile.role !== 'teacher' && !profile.is_admin && (
+          {/* МОБИЛЬНАЯ ВЕРСИЯ КНОПОК УЧИТЕЛЯ */}
+          <div className="md:hidden space-y-2">
+            {profile?.role !== 'teacher' && !profile?.is_admin && teacherRequestStatus === 'none' && (
               <button
                 onClick={() => setShowTeacherModal(true)}
-                className="md:hidden w-full flex items-center justify-center gap-2 px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-300"
               >
-                <ShieldCheck className="w-4 h-4" />
-                <span>Я учитель</span>
+                <GraduationCap className="w-4 h-4" /> Стать учителем
               </button>
-          )}
+            )}
+            {teacherRequestStatus === 'pending' && (
+               <div className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-400">
+                  <Clock className="w-4 h-4" /> Заявка на проверке
+               </div>
+            )}
+            {teacherRequestStatus === 'approved' && profile?.role !== 'teacher' && (
+               <button
+                onClick={handleTeacherPayment}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold animate-pulse"
+              >
+                <CreditCard className="w-4 h-4" /> Оплатить Teacher ($9)
+              </button>
+            )}
+             {profile?.role === 'teacher' && (
+               <div className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-cyan-400">
+                  <ShieldCheck className="w-4 h-4" /> Статус подтвержден
+               </div>
+            )}
+          </div>
 
         </div>
 
@@ -148,20 +260,31 @@ export function Dashboard({ onClose }: DashboardProps) {
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               
-              {/* ПРОФИЛЬ */}
-              <div className="bg-slate-800/50 backdrop-blur-sm border border-cyan-500/30 rounded-xl p-4 md:p-6 relative overflow-hidden">
+              {/* ПРОФИЛЬ КАРТОЧКА */}
+              <div className={`backdrop-blur-sm border rounded-xl p-4 md:p-6 relative overflow-hidden transition-all ${
+                profile.is_premium 
+                  ? 'bg-slate-800/80 border-amber-500/40 shadow-lg shadow-amber-900/10' 
+                  : profile.role === 'teacher'
+                    ? 'bg-slate-800/80 border-cyan-500/40 shadow-lg shadow-cyan-900/10'
+                    : 'bg-slate-800/50 border-slate-700'
+              }`}>
+                {/* Фоновый блеск для премиум */}
+                {(profile.is_premium || profile.role === 'teacher') && (
+                   <div className="absolute -top-10 -right-10 w-24 h-24 bg-white/5 rounded-full blur-2xl" />
+                )}
+
                 <div className="flex items-center gap-3 mb-3 relative z-10">
-                  <div className="p-2 bg-cyan-500/20 rounded-lg">
-                    <User className="w-5 h-5 text-cyan-400" />
+                  <div className={`p-2 rounded-lg ${profile.is_premium ? 'bg-amber-500/20' : 'bg-slate-700'}`}>
+                    <User className={`w-5 h-5 ${profile.is_premium ? 'text-amber-400' : 'text-slate-400'}`} />
                   </div>
-                  <div className="text-cyan-400/60 text-xs md:text-sm uppercase tracking-wider">
-                    {profile.role === 'teacher' ? 'Учитель' : 'Сотрудник'}
+                  <div className={`text-xs md:text-sm uppercase tracking-wider ${profile.is_premium ? 'text-amber-400 font-bold' : 'text-slate-500'}`}>
+                    {profile.role === 'teacher' ? 'Ментор' : profile.is_premium ? 'Cadet Premium' : 'Cadet'}
                   </div>
                 </div>
                 <div className="text-lg md:text-xl font-bold text-white truncate relative z-10">{profile.username}</div>
                 
                 {profile.companion_name && (
-                  <div className="mt-4 pt-4 border-t border-slate-700 flex items-center gap-4 animate-in slide-in-from-left-4 fade-in duration-500">
+                  <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-4">
                      <img 
                        src="/meerkat/avatar.png" 
                        alt="Pet" 
@@ -169,14 +292,14 @@ export function Dashboard({ onClose }: DashboardProps) {
                        onError={(e) => { e.currentTarget.style.display='none'; }}
                      />
                      <div>
-                       <div className="text-[10px] text-amber-400/60 font-mono uppercase tracking-wider">Компаньон</div>
-                       <div className="text-amber-100 font-bold text-lg">{profile.companion_name}</div>
+                       <div className="text-[10px] text-slate-500 uppercase tracking-wider">Компаньон</div>
+                       <div className="text-slate-200 font-bold text-lg">{profile.companion_name}</div>
                      </div>
                   </div>
                 )}
               </div>
 
-              {/* УРОВЕНЬ */}
+              {/* ОСТАЛЬНЫЕ КАРТОЧКИ (без изменений) */}
               <div className="bg-slate-800/50 backdrop-blur-sm border border-purple-500/30 rounded-xl p-4 md:p-6">
                 <div className="flex items-center gap-3 mb-2 md:mb-3">
                   <div className="p-2 bg-purple-500/20 rounded-lg">
@@ -187,7 +310,6 @@ export function Dashboard({ onClose }: DashboardProps) {
                 <div className="text-2xl font-bold text-white">LVL {profile.clearance_level}</div>
               </div>
 
-              {/* ОПЫТ */}
               <div className="bg-slate-800/50 backdrop-blur-sm border border-emerald-500/30 rounded-xl p-4 md:p-6">
                 <div className="flex items-center gap-3 mb-2 md:mb-3">
                   <div className="p-2 bg-emerald-500/20 rounded-lg">
@@ -198,7 +320,6 @@ export function Dashboard({ onClose }: DashboardProps) {
                 <div className="text-2xl font-bold text-white">{profile.total_experiments}</div>
               </div>
 
-              {/* ТОЧНОСТЬ */}
               <div className="bg-slate-800/50 backdrop-blur-sm border border-blue-500/30 rounded-xl p-4 md:p-6">
                 <div className="flex items-center gap-3 mb-2 md:mb-3">
                   <div className="p-2 bg-blue-500/20 rounded-lg">
@@ -210,6 +331,7 @@ export function Dashboard({ onClose }: DashboardProps) {
               </div>
             </div>
 
+            {/* СЕКЦИИ ДОСТИЖЕНИЙ И ИСТОРИИ ОСТАЮТСЯ БЕЗ ИЗМЕНЕНИЙ */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mb-8">
               {/* ДОСТИЖЕНИЯ */}
               <div>
@@ -314,8 +436,10 @@ export function Dashboard({ onClose }: DashboardProps) {
           </>
         )}
         
-        {/* Рендер модалки учителя */}
-        {showTeacherModal && <BecomeTeacherModal onClose={() => setShowTeacherModal(false)} />}
+        {showTeacherModal && <BecomeTeacherModal onClose={() => {
+            setShowTeacherModal(false);
+            checkTeacherRequest(); // Обновляем статус после закрытия модалки
+        }} />}
       </div>
     </div>
   );
