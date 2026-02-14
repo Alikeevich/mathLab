@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { X, UploadCloud, FileText, CheckCircle, ShieldCheck, Loader, Mail } from 'lucide-react';
+import { X, UploadCloud, FileText, CheckCircle, ShieldCheck, Loader, Mail, AlertTriangle, XCircle } from 'lucide-react';
 
 type Props = {
   onClose: () => void;
@@ -63,12 +63,12 @@ export function BecomeTeacherModal({ onClose }: Props) {
       if (dbError) throw dbError;
 
       setStatus('success');
-      refreshProfile(); // Обновляем профиль (хотя статус пока не изменился)
+      await refreshProfile(); // Обновляем профиль (чтобы дашборд узнал о заявке)
 
     } catch (error: any) {
       console.error('Error submitting teacher request:', error);
       setStatus('error');
-      setErrorMsg(error.message || 'Не удалось отправить заявку.');
+      setErrorMsg(error.message || 'Не удалось отправить заявку. Попробуйте позже.');
     } finally {
       setLoading(false);
     }
@@ -78,17 +78,25 @@ export function BecomeTeacherModal({ onClose }: Props) {
   if (status === 'success') {
     return (
       <div className="fixed inset-0 z-[200] bg-slate-900/95 backdrop-blur-sm flex items-center justify-center p-4 animate-in zoom-in duration-300">
-        <div className="bg-slate-800 border border-emerald-500/50 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl">
+        <div className="bg-slate-800 border border-emerald-500/50 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl relative overflow-hidden">
+          
+          {/* Конфетти эффект (просто декор) */}
+          <div className="absolute inset-0 bg-emerald-500/5 pointer-events-none" />
+
           <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
             <CheckCircle className="w-10 h-10 text-emerald-400" />
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">Заявка принята!</h2>
-          <p className="text-slate-400 mb-6 text-sm leading-relaxed">
-            Мы проверим ваши документы в течение 24 часов и отправим ответ на почту: <br/>
-            <span className="text-cyan-400 font-mono font-bold">{contactEmail}</span>
+          <p className="text-slate-400 mb-8 text-sm leading-relaxed">
+            Мы проверим ваши документы в течение 24 часов. <br/>
+            Результат проверки придет на почту: <br/>
+            <span className="text-emerald-400 font-mono font-bold bg-emerald-500/10 px-2 py-0.5 rounded mt-1 inline-block">{contactEmail}</span>
           </p>
-          <button onClick={onClose} className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-900/20">
-            Отлично
+          <button 
+            onClick={onClose} 
+            className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-900/20 active:scale-95"
+          >
+            Отлично, жду!
           </button>
         </div>
       </div>
@@ -101,32 +109,38 @@ export function BecomeTeacherModal({ onClose }: Props) {
       <div className="bg-slate-900 border border-cyan-500/30 w-full max-w-lg rounded-3xl shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* Header */}
-        <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/50">
+        <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/50 shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-amber-500/10 rounded-lg border border-amber-500/30">
               <ShieldCheck className="w-6 h-6 text-amber-400" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-white leading-none">Аккаунт Учителя</h2>
-              <p className="text-xs text-slate-500 mt-1">Верификация</p>
+              <p className="text-xs text-slate-500 mt-1 font-medium uppercase tracking-wide">Верификация</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full transition-colors">
-            <X className="w-5 h-5 text-slate-400 hover:text-white" />
+          <button 
+            onClick={onClose} 
+            className="p-2 hover:bg-slate-800 rounded-full transition-colors group"
+          >
+            <X className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors" />
           </button>
         </div>
 
         <div className="p-6 overflow-y-auto custom-scrollbar">
           {/* Инфо блок */}
-          <div className="mb-6 p-4 bg-cyan-900/10 border border-cyan-500/20 rounded-xl text-sm text-cyan-200">
-            <h4 className="font-bold mb-2 flex items-center gap-2 text-cyan-400">
+          <div className="mb-8 p-4 bg-cyan-900/10 border border-cyan-500/20 rounded-xl text-sm text-cyan-100/90 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+              <FileText className="w-24 h-24 text-cyan-400" />
+            </div>
+            <h4 className="font-bold mb-3 flex items-center gap-2 text-cyan-400 relative z-10">
               <FileText className="w-4 h-4"/> Возможности учителя:
             </h4>
-            <ul className="list-disc pl-5 space-y-1 opacity-80 text-xs md:text-sm">
+            <ul className="list-disc pl-5 space-y-1.5 text-xs md:text-sm relative z-10">
               <li>Создание закрытых турниров для класса</li>
-              <li>Доступ к Генератору задач</li>
-              <li>Специальный бейдж в профиле</li>
-              <li>Аналитика успеваемости учеников</li>
+              <li>Доступ к Генератору задач (Printable)</li>
+              <li>Специальный бейдж <span className="text-cyan-400 font-bold">Teacher</span> в профиле</li>
+              <li>Аналитика успеваемости учеников (Скоро)</li>
             </ul>
           </div>
 
@@ -150,13 +164,15 @@ export function BecomeTeacherModal({ onClose }: Props) {
                   required
                 />
               </div>
-              <p className="text-[10px] text-slate-500 mt-1">На этот адрес придет результат проверки.</p>
+              <p className="text-[10px] text-slate-500 mt-1.5 ml-1">
+                На этот адрес мы отправим результат проверки заявки.
+              </p>
             </div>
 
             {/* 2. Загрузка файла */}
             <div>
               <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">
-                Документ (Диплом / Справка)
+                Документ (Диплом / Справка с места работы)
               </label>
               <div className="relative group cursor-pointer">
                 <input 
@@ -165,18 +181,24 @@ export function BecomeTeacherModal({ onClose }: Props) {
                   onChange={handleFileChange}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                 />
-                <div className={`border-2 border-dashed rounded-xl p-6 text-center transition-all ${file ? 'border-emerald-500 bg-emerald-500/5' : 'border-slate-600 group-hover:border-cyan-400 group-hover:bg-slate-800'}`}>
+                <div className={`border-2 border-dashed rounded-xl p-6 text-center transition-all duration-300 ${file ? 'border-emerald-500 bg-emerald-500/5' : 'border-slate-600 group-hover:border-cyan-400 group-hover:bg-slate-800'}`}>
                   {file ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <CheckCircle className="w-8 h-8 text-emerald-400 animate-in zoom-in" />
-                      <span className="text-emerald-400 font-bold text-sm truncate max-w-[200px]">{file.name}</span>
-                      <span className="text-xs text-slate-500">Нажмите, чтобы заменить</span>
+                    <div className="flex flex-col items-center gap-2 animate-in zoom-in">
+                      <div className="p-2 bg-emerald-500/20 rounded-full">
+                         <CheckCircle className="w-6 h-6 text-emerald-400" />
+                      </div>
+                      <div>
+                        <span className="text-emerald-400 font-bold text-sm truncate max-w-[200px] block">{file.name}</span>
+                        <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Готов к загрузке</span>
+                      </div>
                     </div>
                   ) : (
                     <div className="text-slate-500 group-hover:text-cyan-400 transition-colors flex flex-col items-center">
-                      <UploadCloud className="w-8 h-8 mb-2" />
+                      <div className="p-3 bg-slate-800 rounded-full mb-3 group-hover:bg-cyan-500/10 transition-colors">
+                        <UploadCloud className="w-8 h-8" />
+                      </div>
                       <span className="text-sm font-medium">Нажмите для загрузки файла</span>
-                      <span className="text-xs opacity-70 mt-1">PDF, JPG, PNG (до 5 МБ)</span>
+                      <span className="text-xs opacity-60 mt-1">PDF, JPG, PNG (до 5 МБ)</span>
                     </div>
                   )}
                 </div>
@@ -184,37 +206,44 @@ export function BecomeTeacherModal({ onClose }: Props) {
             </div>
 
             {/* 3. Чекбокс */}
-            <label className="flex items-start gap-3 cursor-pointer group p-3 rounded-xl hover:bg-slate-800/50 transition-colors">
-              <input 
-                type="checkbox" 
-                checked={agreed} 
-                onChange={(e) => setAgreed(e.target.checked)}
-                className="mt-1 w-5 h-5 rounded border-slate-600 bg-slate-800 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-slate-900 accent-cyan-500 cursor-pointer"
-              />
-              <span className="text-xs text-slate-400 group-hover:text-slate-300 transition-colors leading-snug">
-                Я подтверждаю подлинность документов. Я понимаю, что предоставление ложных данных приведет к блокировке аккаунта.
-              </span>
-            </label>
+            <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50 hover:border-slate-600 transition-colors">
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  checked={agreed} 
+                  onChange={(e) => setAgreed(e.target.checked)}
+                  className="mt-1 w-5 h-5 rounded border-slate-500 bg-slate-700 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-slate-900 accent-cyan-500 cursor-pointer shrink-0"
+                />
+                <span className="text-xs text-slate-400 group-hover:text-slate-300 transition-colors leading-snug">
+                  Я подтверждаю подлинность документов. Я понимаю, что предоставление ложных данных приведет к вечной блокировке аккаунта.
+                </span>
+              </label>
+            </div>
 
+            {/* Ошибки */}
             {status === 'error' && (
-              <div className="text-red-400 text-xs text-center bg-red-500/10 p-3 rounded-lg border border-red-500/20 flex items-center justify-center gap-2">
-                <XCircle className="w-4 h-4" />
-                {errorMsg}
+              <div className="text-red-400 text-xs text-center bg-red-500/10 p-3 rounded-lg border border-red-500/20 flex items-center justify-center gap-2 animate-in slide-in-from-top-2">
+                <XCircle className="w-4 h-4 shrink-0" />
+                <span>{errorMsg}</span>
               </div>
             )}
 
+            {/* Кнопка */}
             <button 
               type="submit" 
               disabled={!file || !agreed || !contactEmail || loading}
-              className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95"
+              className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 group"
             >
               {loading ? (
                 <>
                   <Loader className="animate-spin w-5 h-5" />
-                  Отправка...
+                  <span>Отправка данных...</span>
                 </>
               ) : (
-                'ОТПРАВИТЬ ЗАЯВКУ'
+                <>
+                  <span>ОТПРАВИТЬ ЗАЯВКУ</span>
+                  <div className="w-2 h-2 bg-white rounded-full group-hover:animate-ping" />
+                </>
               )}
             </button>
 
