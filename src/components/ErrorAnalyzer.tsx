@@ -12,13 +12,15 @@ import {
   ClipboardList,
   ChevronDown,
   ChevronUp,
-  AlertTriangle
+  AlertTriangle,
+  Lock,      // Импорт
+  Zap        // Импорт
 } from 'lucide-react';
 
 // Типы данных
 type ErrorRecord = {
   id: string;
-  problem_id: string; // Важно для запуска тренировки
+  problem_id: string;
   user_answer: string;
   correct_answer: string;
   created_at: string;
@@ -40,19 +42,23 @@ type GroupedErrors = {
 
 type ErrorAnalyzerProps = {
   onBack: () => void;
-  onStartTraining: (problemIds: string[]) => void; // Новый проп
+  onStartTraining: (problemIds: string[]) => void;
 };
 
 export function ErrorAnalyzer({ onBack, onStartTraining }: ErrorAnalyzerProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth(); // Берем profile для проверки
   const [errors, setErrors] = useState<ErrorRecord[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [expandedTheoryId, setExpandedTheoryId] = useState<string | null>(null);
 
+  // === ПРОВЕРКА ДОСТУПА ===
+  const hasAccess = profile?.is_premium || profile?.role === 'teacher' || profile?.role === 'admin';
+
   useEffect(() => {
-    if (user) loadErrors();
-  }, [user]);
+    if (user && hasAccess) loadErrors();
+    else setLoading(false);
+  }, [user, hasAccess]);
 
   async function loadErrors() {
     setLoading(true);
@@ -68,13 +74,13 @@ export function ErrorAnalyzer({ onBack, onStartTraining }: ErrorAnalyzerProps) {
       .order('created_at', { ascending: false });
 
     if (data) {
-      // @ts-ignore: Supabase types mapping helper
+      // @ts-ignore
       setErrors(data);
     }
     setLoading(false);
   }
 
-  // Группировка ошибок по модулям
+  // Группировка ошибок
   const groupedErrors: GroupedErrors = errors.reduce((acc, err) => {
     const modName = err.module.name;
     if (!acc[modName]) acc[modName] = [];
@@ -91,9 +97,7 @@ export function ErrorAnalyzer({ onBack, onStartTraining }: ErrorAnalyzerProps) {
     setExpandedTheoryId(prev => prev === id ? null : id);
   };
 
-  // Функция запуска тренировки
   const handleStartTraining = () => {
-    // Собираем уникальные ID задач
     const problemIds = Array.from(new Set(errors.map(e => e.problem_id)));
     if (problemIds.length > 0) {
       onStartTraining(problemIds);
@@ -106,9 +110,58 @@ export function ErrorAnalyzer({ onBack, onStartTraining }: ErrorAnalyzerProps) {
     </div>
   );
 
+  // === PAYWALL (БЛОКИРОВКА ДОСТУПА) ===
+  if (!hasAccess) {
+    return (
+      <div className="min-h-full bg-slate-900 p-4 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in duration-300">
+        <div className="max-w-md w-full bg-slate-800/50 border border-amber-500/30 p-8 rounded-3xl shadow-2xl relative overflow-hidden">
+          
+          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+          
+          <div className="bg-slate-900 p-4 rounded-full inline-block mb-6 border border-slate-700 shadow-lg">
+            <Lock className="w-8 h-8 text-amber-400" />
+          </div>
+          
+          <h2 className="text-2xl font-black text-white mb-2 uppercase tracking-wide">
+            Доступ закрыт
+          </h2>
+          <p className="text-slate-400 mb-6 leading-relaxed text-sm">
+            Журнал ошибок — это инструмент для анализа слабых мест. Он доступен только в тарифе <strong>Premium</strong>.
+          </p>
+
+          <div className="space-y-3 mb-8 text-left bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+            <div className="flex items-center gap-3 text-sm text-slate-300">
+              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>История ошибок за 48 часов</span>
+            </div>
+            <div className="flex items-center gap-3 text-sm text-slate-300">
+              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Умная группировка по темам</span>
+            </div>
+            <div className="flex items-center gap-3 text-sm text-slate-300">
+              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Доступ к теоретическим материалам</span>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+             <button onClick={onBack} className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-bold transition-colors">
+               Назад
+             </button>
+             <a href="/pricing" className="flex-[2] py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:brightness-110 text-white rounded-xl font-bold transition-all shadow-lg shadow-orange-900/20 flex items-center justify-center gap-2">
+               <Zap className="w-4 h-4 fill-current" />
+               Купить Premium
+             </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // === ОСНОВНОЙ РЕНДЕР (ЕСЛИ ЕСТЬ ДОСТУП) ===
   return (
     <div className="min-h-full bg-slate-900 p-4 md:p-8 overflow-y-auto custom-scrollbar">
-      {/* Header */}
+      
       <div className="flex items-center justify-between mb-8">
         <button onClick={onBack} className="text-slate-400 hover:text-white flex items-center gap-2 transition-colors">
           <ChevronRight className="w-5 h-5 rotate-180" /> Назад
@@ -129,7 +182,6 @@ export function ErrorAnalyzer({ onBack, onStartTraining }: ErrorAnalyzerProps) {
       ) : (
         <div className="space-y-8">
           
-          {/* Сводка (Dashboard) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-slate-800/50 border border-slate-700 p-6 rounded-2xl">
               <h3 className="text-slate-400 text-sm uppercase tracking-wider mb-3 flex items-center gap-2">
@@ -169,7 +221,6 @@ export function ErrorAnalyzer({ onBack, onStartTraining }: ErrorAnalyzerProps) {
             </div>
           </div>
 
-          {/* Детальный список */}
           <div className="space-y-4">
             <h2 className="text-lg font-bold text-white px-1 uppercase tracking-wide text-slate-400 text-xs">Детальный разбор</h2>
             {errors.map((err) => (
