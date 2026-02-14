@@ -9,7 +9,7 @@ export interface CalibrationState {
 }
 
 const CALIBRATION_MATCHES = 5;
-const BASE_MMR = 1000;
+const BASE_MMR = 700;
 
 // === НАЧАТЬ КАЛИБРОВКУ ===
 export async function startCalibration(userId: string): Promise<void> {
