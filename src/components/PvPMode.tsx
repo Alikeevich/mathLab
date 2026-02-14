@@ -394,6 +394,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
   // 1. Lobby
   if (status === 'lobby') {
     const isUnranked = !!(profile && !profile.has_calibrated);
+    // ИСПРАВЛЕНО: Теперь берем корректное значение сыгранных матчей
     const calibPlayed = profile?.calibration_matches_played ?? 0;
 
     return (
@@ -456,7 +457,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     );
   }
 
-  // 3. Battle (RESTORED UI)
+  // 3. Battle (RESTORED & FIXED UI)
   if (status === 'battle') {
     const currentProb = problems[currentProbIndex];
     return (
@@ -485,7 +486,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
           </div>
         )}
 
-        {/* --- ВЕРХНЯЯ ЧАСТЬ: ТОЛЬКО СЧЕТ И ПРОГРЕСС (Task убрали отсюда) --- */}
+        {/* --- STICKY TOP: SCOREBOARD --- */}
         <div className="flex-shrink-0 bg-slate-900 border-b border-slate-800 shadow-lg z-10">
           
           {/* Scoreboard */}
@@ -521,19 +522,18 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
           </div>
         </div>
 
-        {/* --- СРЕДНЯЯ ЧАСТЬ: ТЕПЕРЬ ТУТ ЗАДАЧА --- */}
-        {/* Используем flex-1, чтобы занять всё свободное место, и center для выравнивания */}
+        {/* --- MIDDLE: TASK (Centered & Large) --- */}
         <div className="flex-1 flex flex-col items-center justify-center p-4 bg-slate-900 overflow-y-auto">
           {currentProb ? (
              <div className="w-full max-w-lg">
                 {/* Карточка задачи с увеличенным шрифтом */}
                 <div className="bg-slate-800/50 backdrop-blur-sm border border-cyan-500/20 rounded-2xl p-6 shadow-xl text-center min-h-[150px] flex flex-col items-center justify-center">
                   <div className="text-2xl md:text-3xl font-bold text-white leading-relaxed tracking-wide">
-                    {/* LaTeX рендеринг */}
+                    {/* LaTeX рендеринг (ИСПРАВЛЕНО: добавлены $) */}
                     <Latex>{`$${currentProb.question}$`}</Latex>
                   </div>
                   
-                  {/* Подсказка для типа задачи, если нужно */}
+                  {/* Подсказка для типа задачи */}
                   <div className="mt-4 text-xs text-slate-500 font-mono uppercase tracking-widest">
                     Решите задачу
                   </div>
@@ -547,7 +547,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
           )}
         </div>
 
-        {/* --- НИЖНЯЯ ЧАСТЬ: ВВОД И КЛАВИАТУРА --- */}
+        {/* --- BOTTOM: INPUT & KEYPAD --- */}
         <div className="flex-shrink-0 bg-slate-900 border-t border-slate-800 shadow-2xl z-20 pb-safe">
           {feedback ? (
             <div className={`p-8 flex flex-col items-center justify-center h-[320px] animate-in zoom-in duration-200 ${feedback === 'correct' ? 'bg-emerald-900/20' : 'bg-red-900/20'}`}>
