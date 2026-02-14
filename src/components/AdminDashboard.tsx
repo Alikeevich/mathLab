@@ -10,13 +10,12 @@ type Props = {
   onClose: () => void;
 };
 
-// Обновленный тип данных заявки
 type TeacherRequest = {
   id: string;
   user_id: string;
-  full_name: string; // Новое поле
-  position: string;  // Новое поле
-  school: string;    // Новое поле
+  full_name: string;
+  position: string;
+  school: string;
   document_url: string;
   contact_email: string;
   status: string;
@@ -30,7 +29,6 @@ type TeacherRequest = {
 export function AdminDashboard({ onClose }: Props) {
   const [activeTab, setActiveTab] = useState<'users' | 'requests' | 'broadcast'>('users');
   
-  // Состояния данных
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [requests, setRequests] = useState<TeacherRequest[]>([]);
   const [search, setSearch] = useState('');
@@ -98,7 +96,7 @@ export function AdminDashboard({ onClose }: Props) {
     // Шаблоны сообщений
     if (type === 'approve') {
       setFeedbackMessage(
-        `Здравствуйте, ${req.full_name}!\n\nВаша заявка одобрена. Мы подтвердили ваши данные из ${req.school}.\nВам присвоен статус "Учитель". Теперь вы можете создавать турниры и управлять классом.`
+        `Здравствуйте, ${req.full_name}!\n\nВаши документы успешно прошли проверку. Статус верификации подтвержден.\n\nЧтобы активировать функции Учителя (создание турниров, аналитика), пожалуйста, перейдите в раздел "Тарифы" и оплатите подписку Teacher.`
       );
     } else {
       setFeedbackMessage(
@@ -107,13 +105,13 @@ export function AdminDashboard({ onClose }: Props) {
     }
   };
 
-  // 2. Финальная обработка (отправка в базу)
+  // 2. Финальная обработка
   const confirmAction = async () => {
     if (!selectedReq || !actionType) return;
     
     setProcessing(true);
     try {
-      // А. Обновляем статус заявки
+      // А. Обновляем статус заявки в teacher_requests
       const { error: reqError } = await supabase
         .from('teacher_requests')
         .update({ status: actionType === 'approve' ? 'approved' : 'rejected' })
@@ -121,20 +119,17 @@ export function AdminDashboard({ onClose }: Props) {
 
       if (reqError) throw reqError;
 
-      // Б. Если одобрено — выдаем роль
-      if (actionType === 'approve') {
-        await supabase.from('profiles').update({ role: 'teacher' }).eq('id', selectedReq.user_id);
-      }
+      // ВАЖНО: Мы НЕ обновляем profiles.role здесь. Это происходит после оплаты.
 
-      // В. Отправляем уведомление с КАСТОМНЫМ текстом
+      // Б. Отправляем уведомление
       await supabase.from('notifications').insert({
         user_id: selectedReq.user_id,
-        title: actionType === 'approve' ? 'Статус учителя подтвержден!' : 'Заявка отклонена',
-        message: feedbackMessage, // <-- Текст из textarea
+        title: actionType === 'approve' ? 'Документы проверены' : 'Заявка отклонена',
+        message: feedbackMessage,
         type: actionType === 'approve' ? 'success' : 'error'
       });
 
-      // Г. Чистим UI
+      // В. Чистим UI
       setRequests(prev => prev.filter(r => r.id !== selectedReq.id));
       setSelectedReq(null);
       setActionType(null);
@@ -246,7 +241,7 @@ export function AdminDashboard({ onClose }: Props) {
             </div>
           )}
 
-          {/* === REQUESTS TAB (НОВЫЙ UI) === */}
+          {/* === REQUESTS TAB === */}
           {activeTab === 'requests' && (
             <div className="max-w-4xl mx-auto">
               {loading ? <div className="text-center py-10"><Loader className="w-8 h-8 animate-spin mx-auto text-slate-500"/></div> : 
@@ -254,8 +249,6 @@ export function AdminDashboard({ onClose }: Props) {
                 <div className="grid gap-6">
                   {requests.map(req => (
                     <div key={req.id} className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-lg">
-                      
-                      {/* Верхняя часть: Основная инфа */}
                       <div className="flex justify-between items-start mb-6 border-b border-slate-700 pb-4">
                         <div className="flex items-center gap-4">
                           <div className="w-12 h-12 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-400">
@@ -278,7 +271,6 @@ export function AdminDashboard({ onClose }: Props) {
                         </div>
                       </div>
 
-                      {/* Детали: Школа и Должность */}
                       <div className="grid grid-cols-2 gap-4 mb-6">
                         <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
                            <div className="flex items-center gap-2 text-xs text-slate-500 uppercase font-bold mb-1">
@@ -294,7 +286,6 @@ export function AdminDashboard({ onClose }: Props) {
                         </div>
                       </div>
 
-                      {/* Документ и кнопки */}
                       <div className="flex items-center justify-between gap-4">
                         <button onClick={() => downloadDocument(req.document_url)} className="text-cyan-400 hover:text-cyan-300 text-sm font-bold flex items-center gap-2 hover:underline">
                           <FileText className="w-4 h-4" /> Смотреть документ
@@ -331,19 +322,19 @@ export function AdminDashboard({ onClose }: Props) {
         </div>
       </div>
 
-      {/* === МОДАЛКА ПОДТВЕРЖДЕНИЯ ДЕЙСТВИЯ === */}
+      {/* === МОДАЛКА ПОДТВЕРЖДЕНИЯ === */}
       {selectedReq && actionType && (
         <div className="fixed inset-0 z-[210] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-slate-800 border border-slate-600 w-full max-w-lg rounded-2xl p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className={`text-xl font-bold ${actionType === 'approve' ? 'text-emerald-400' : 'text-red-400'}`}>
-                {actionType === 'approve' ? 'Подтверждение учителя' : 'Отклонение заявки'}
+                {actionType === 'approve' ? 'Подтверждение верификации' : 'Отклонение заявки'}
               </h3>
               <button onClick={() => { setSelectedReq(null); setActionType(null); }} className="text-slate-400 hover:text-white"><X className="w-6 h-6"/></button>
             </div>
             
             <div className="mb-4">
-              <label className="block text-slate-400 text-sm font-bold mb-2">Сообщение пользователю (можно редактировать)</label>
+              <label className="block text-slate-400 text-sm font-bold mb-2">Сообщение пользователю</label>
               <textarea 
                 value={feedbackMessage} 
                 onChange={(e) => setFeedbackMessage(e.target.value)}
@@ -359,7 +350,7 @@ export function AdminDashboard({ onClose }: Props) {
                 className={`px-6 py-2 rounded-xl text-white font-bold flex items-center gap-2 ${actionType === 'approve' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-red-600 hover:bg-red-500'}`}
               >
                 {processing ? <Loader className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                {actionType === 'approve' ? 'Подтвердить и отправить' : 'Отклонить и отправить'}
+                {actionType === 'approve' ? 'Верифицировать' : 'Отклонить'}
               </button>
             </div>
           </div>
