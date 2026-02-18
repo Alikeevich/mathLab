@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { BecomeTeacherModal } from './BecomeTeacherModal';
 import { getPaddleInstance } from '../lib/paddle';
 
+// ID Цен из Paddle Dashboard
 const PADDLE_PRICE_IDS = {
   PREMIUM: 'pro_01khs2jy2vbmjj09q91p38nkbf', 
   TEACHER: 'pro_01khs2jq904f4sxeggrd55ynr3' 
@@ -13,31 +14,15 @@ const PADDLE_PRICE_IDS = {
 export function PricingPage() {
   const { user, profile, refreshProfile } = useAuth();
   
-  // Состояния для тарифа Teacher
+  // Состояния
   const [requestStatus, setRequestStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
   const [loading, setLoading] = useState(true);
-  const [processingPayment, setProcessingPayment] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
-  const openCheckout = async (priceId: string) => {
-    if (!user) return alert("Пожалуйста, войдите в аккаунт.");
-    
-    const paddle = await getPaddleInstance();
-    if (!paddle) return alert("Ошибка инициализации платежной системы");
+  
+  // Состояние для блокировки кнопок во время открытия окна оплаты
+  const [processingPayment, setProcessingPayment] = useState(false);
 
-    paddle.Checkout.open({
-      items: [{ priceId: priceId, quantity: 1 }],
-      customData: {
-        userId: user.id, // ВАЖНО: Привязываем платеж к ID юзера
-        tier: priceId === PADDLE_PRICE_IDS.TEACHER ? 'teacher' : 'premium'
-      },
-      settings: {
-        displayMode: 'overlay',
-        theme: 'dark',
-        locale: 'ru'
-      }
-    });
-  };
-
+  // === 1. Проверка статуса заявки учителя ===
   useEffect(() => {
     async function checkStatus() {
       if (!user) {
@@ -59,39 +44,40 @@ export function PricingPage() {
     checkStatus();
   }, [user]);
 
-  // Симуляция оплаты и выдача роли
-  const handleTeacherPurchase = async () => {
-    if (!user) return;
+  // === 2. Открытие оплаты через Paddle ===
+  const openCheckout = async (priceId: string) => {
+    if (!user) return alert("Пожалуйста, войдите в аккаунт.");
+    
     setProcessingPayment(true);
-
+    
     try {
-      // Здесь была бы интеграция с Paddle/Stripe
-      await new Promise(r => setTimeout(r, 1500)); // Имитация задержки
+      const paddle = await getPaddleInstance();
+      if (!paddle) {
+        alert("Ошибка инициализации платежной системы");
+        return;
+      }
 
-      // Обновляем роль
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role: 'teacher' })
-        .eq('id', user.id);
-
-      if (error) throw error;
-
-      await refreshProfile();
-      alert("Оплата прошла успешно! Вам присвоен статус Учителя.");
-      window.location.href = "/"; // Редирект в дэшборд
-
-    } catch (e) {
-      console.error(e);
-      alert("Ошибка при обработке платежа.");
+      paddle.Checkout.open({
+        items: [{ priceId: priceId, quantity: 1 }],
+        customData: {
+          userId: user.id, // ВАЖНО: ID для вебхука
+          tier: priceId === PADDLE_PRICE_IDS.TEACHER ? 'teacher' : 'premium'
+        },
+        settings: {
+          displayMode: 'overlay',
+          theme: 'dark',
+          locale: 'ru'
+        }
+      });
+    } catch (error) {
+      console.error("Paddle Error:", error);
+      alert("Не удалось открыть окно оплаты.");
     } finally {
       setProcessingPayment(false);
     }
   };
 
-  const handlePremiumPurchase = async () => {
-    alert("Скоро подключим платежку для Premium!");
-  };
-
+  // === 3. Конфигурация тарифов ===
   const plans = [
     {
       name: 'Cadet',
@@ -133,12 +119,19 @@ export function PricingPage() {
       color: 'amber',
       icon: <Zap className="w-4 h-4" />,
       action: (
-        <button 
-          onClick={() => openCheckout(PADDLE_PRICE_IDS.PREMIUM)}
-          className="w-full py-4 rounded-xl font-bold text-white bg-gradient-to-r from-amber-500 to-orange-600 hover:brightness-110 shadow-lg shadow-orange-900/30 transition-all active:scale-95"
-        >
-          Купить Premium
-        </button>
+        profile?.is_premium ? (
+          <button className="w-full py-4 rounded-xl font-bold bg-amber-900/20 text-amber-400 border border-amber-500/30 cursor-default flex items-center justify-center gap-2">
+            <Check className="w-4 h-4"/> Уже куплено
+          </button>
+        ) : (
+          <button 
+            onClick={() => openCheckout(PADDLE_PRICE_IDS.PREMIUM)}
+            disabled={processingPayment}
+            className="w-full py-4 rounded-xl font-bold text-white bg-gradient-to-r from-amber-500 to-orange-600 hover:brightness-110 shadow-lg shadow-orange-900/30 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-wait"
+          >
+            {processingPayment ? 'Загрузка...' : 'Купить Premium'}
+          </button>
+        )
       ),
       highlight: true
     },
@@ -160,25 +153,29 @@ export function PricingPage() {
       highlight: false,
       // Особая логика кнопки для учителя
       action: (() => {
+        // 1. Если уже учитель
         if (profile?.role === 'teacher' || profile?.role === 'admin') {
           return <button className="w-full py-4 rounded-xl font-bold bg-cyan-900/20 text-cyan-400 border border-cyan-500/30 cursor-default flex items-center justify-center gap-2"><Check className="w-4 h-4"/> Активен</button>;
         }
         
+        // 2. Если загрузка статуса
         if (loading) return <div className="py-4 text-center"><Loader className="w-5 h-5 animate-spin mx-auto text-slate-500"/></div>;
 
+        // 3. Если заявка одобрена -> Кнопка оплаты
         if (requestStatus === 'approved') {
           return (
             <button 
               onClick={() => openCheckout(PADDLE_PRICE_IDS.TEACHER)}
               disabled={processingPayment}
-              className="..."
+              className="w-full py-4 rounded-xl font-bold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-wait"
             >
-              {processingPayment ? <Loader.../> : <ShieldCheck.../>}
-              {processingPayment ? 'Загрузка...' : 'Оплатить доступ'}
+              {processingPayment ? <Loader className="w-4 h-4 animate-spin"/> : <ShieldCheck className="w-4 h-4"/>}
+              {processingPayment ? 'Открытие кассы...' : 'Оплатить доступ'}
             </button>
           );
         }
 
+        // 4. Иначе -> Кнопка верификации
         return (
           <button 
             onClick={() => setShowVerificationModal(true)}
@@ -192,6 +189,7 @@ export function PricingPage() {
     }
   ];
 
+  // === RENDER ===
   return (
     <div className="min-h-screen bg-slate-900 text-slate-300 font-sans selection:bg-cyan-500/30 overflow-y-auto">
       
@@ -281,7 +279,7 @@ export function PricingPage() {
           ))}
         </div>
 
-        {/* Footer for Compliance */}
+        {/* Footer */}
         <div className="border-t border-slate-800 pt-8 text-center text-xs text-slate-600">
           <div className="flex flex-wrap justify-center gap-6 mb-4 font-medium text-slate-500">
             <a href="/terms-and-conditions" className="hover:text-cyan-400 transition-colors">Условия использования</a>
@@ -297,11 +295,13 @@ export function PricingPage() {
       {showVerificationModal && (
         <BecomeTeacherModal onClose={() => {
           setShowVerificationModal(false);
-          // Перезагрузим статус
-          supabase.from('teacher_requests').select('status').eq('user_id', user!.id).maybeSingle().then(({data}) => {
-             if(data) setRequestStatus(data.status as any);
-             else setRequestStatus('pending'); // Оптимистично
-          });
+          // Обновляем статус заявки после закрытия модалки
+          if (user) {
+            supabase.from('teacher_requests').select('status').eq('user_id', user.id).maybeSingle().then(({data}) => {
+               if(data) setRequestStatus(data.status as any);
+               else setRequestStatus('pending'); 
+            });
+          }
         }} />
       )}
     </div>
