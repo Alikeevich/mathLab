@@ -15,10 +15,10 @@ export function PricingPage() {
   const { t, i18n } = useTranslation();
   const { user, profile, refreshProfile } = useAuth();
   
-  const = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
-  const = useState(true);
-  const = useState(false);
-  const = useState(false);
+  const [requestStatus, setRequestStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
+  const [loading, setLoading] = useState(true);
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
 
   useEffect(() => {
     async function checkStatus() {
