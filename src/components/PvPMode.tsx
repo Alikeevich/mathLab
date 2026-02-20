@@ -43,34 +43,41 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
   const { t, i18n } = useTranslation();
   const { user, profile, refreshProfile } = useAuth();
 
+  // === State ===
   const [status, setStatus] = useState<DuelState>(initialDuelId ? 'searching' : 'lobby');
   const [duelId, setDuelId] = useState<string | null>(initialDuelId || null);
 
+  // Opponent Data
   const [opponentName, setOpponentName] = useState<string>('???');
   const [opponentMMR, setOpponentMMR] = useState<number>(1000);
   const [isBotMatch, setIsBotMatch] = useState(false);
   const [botName, setBotName] = useState<string>('Bot');
 
+  // Game Data
   const [problems, setProblems] = useState<any[]>([]);
   const [currentProbIndex, setCurrentProbIndex] = useState(0);
   const [myScore, setMyScore] = useState(0);
   const [oppScore, setOppScore] = useState(0);
   const [oppProgress, setOppProgress] = useState(0);
 
+  // Input
   const [userAnswer, setUserAnswer] = useState('');
   const mfRef = useRef<any>(null);
 
+  // Results & UI
   const [winner, setWinner] = useState<'me' | 'opponent' | 'draw' | null>(null);
   const [mmrChange, setMmrChange] = useState<number | null>(null);
   const [xpGained, setXpGained] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [timeLeft, setTimeLeft] = useState(60);
   
+  // Modals / Statuses
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
-  const [showRankLegend, setShowRankLegend] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [showRankLegend, setShowRankLegend] = useState(false);
 
+  // Rank Reveal (Calibration finish)
   const [showRevealModal, setShowRevealModal] = useState(false);
   const [revealOldMMR, setRevealOldMMR] = useState<number | null>(null);
   const [revealNewMMR, setRevealNewMMR] = useState<number | null>(null);
@@ -99,6 +106,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     }
   });
 
+  // Sync bot name
   useEffect(() => {
     if (botOpponent?.botName) setBotName(botOpponent.botName);
     else if (duelId) setBotName(getDeterministicBotName(duelId));
@@ -108,11 +116,13 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     if (status === 'finished') return;
     if (duelId) await supabase.rpc('finish_duel', { duel_uuid: duelId, finisher_uuid: BOT_UUID });
     
+    // Determine winner immediately for bot match
     if (myScore > finalBotScore) endGame('me', 25);
     else if (myScore < finalBotScore) endGame('opponent', -20);
-    else endGame('opponent', -10); 
+    else endGame('opponent', -10); // Draw favors bot slightly in simpler logic, or handle draw
   };
 
+  // === Initial Load / Reconnect ===
   useEffect(() => {
     if (initialDuelId && status === 'searching') {
       reconnectToDuel(initialDuelId);
@@ -148,6 +158,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     setStatus('battle');
   }
 
+  // === Matchmaking ===
   async function findMatch() {
     setStatus('searching');
     setIsBotMatch(false);
@@ -177,6 +188,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
       return;
     }
 
+    // Create new duel
     const { data: allProbs } = await supabase.from('problems').select('id').eq('module_id', PVP_MODULE_ID);
     const shuffled = (allProbs ?? []).sort(() => 0.5 - Math.random()).slice(0, 10).map((p: any) => p.id);
     
@@ -201,6 +213,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
         })
       .subscribe();
 
+    // Fallback to Bot after 7s
     searchTimeoutRef.current = setTimeout(async () => {
       supabase.removeChannel(channel);
       const fakeBotMMR = myMMR + Math.floor(Math.random() * 100 - 50);
@@ -233,12 +246,14 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
       .subscribe();
   }
 
+  // === Game Logic ===
   async function submitResult(isCorrect: boolean) {
     setFeedback(isCorrect ? 'correct' : 'wrong');
     const newScore = isCorrect ? myScore + 1 : myScore;
     setMyScore(newScore);
     const newProgress = currentProbIndex + 1;
 
+    // Save mistake
     if (!isCorrect && user && problems[currentProbIndex]) {
       supabase.from('user_errors').insert({
         user_id: user.id, problem_id: problems[currentProbIndex].id, module_id: PVP_MODULE_ID,
@@ -256,6 +271,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
       if (newProgress >= problems.length) {
         await supabase.rpc('finish_duel', { duel_uuid: duelId, finisher_uuid: user!.id });
         if (isBotMatch) {
+           // Immediate calculation for bot
            if (newScore > oppScore) endGame('me', 25);
            else if (newScore < oppScore) endGame('opponent', -20);
            else endGame('me', 10);
@@ -288,6 +304,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
 
   const handleTimeout = () => submitResult(false);
 
+  // Timer
   useEffect(() => {
     let timer: any;
     if (status === 'battle' && !feedback && currentProbIndex < problems.length) {
@@ -303,6 +320,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
 
   useEffect(() => setTimeLeft(60), [currentProbIndex]);
 
+  // Keypad Handlers
   const keypadProps = {
     onCommand: (cmd: string, arg?: string) => {
       if (cmd === 'insert') mfRef.current?.executeCommand(['insert', arg]);
@@ -314,6 +332,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     onSubmit: () => handleAnswer()
   };
 
+  // === End Game & Calibration Logic ===
   async function endGame(winnerId: string | null, eloChange: number = 0) {
     if (status === 'finished') return;
     setStatus('finished');
@@ -322,13 +341,15 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     setWinner(isWin ? 'me' : 'opponent');
     setMmrChange(Math.abs(eloChange));
 
-    const oldMMR = profile?.mmr ?? 1000;
+    // Capture old MMR for animation
+    const oldMMR = profile?.mmr ?? BASE_MMR;
     setRevealOldMMR(oldMMR);
 
-    // Calibration Logic
+    // 1. Calibration Logic
     if (user && !profile?.has_calibrated) {
       try {
         const result = await recordCalibrationMatch(user.id, isWin, opponentMMR);
+        // If calibration just finished (isCalibrating became false)
         if (result && !result.isCalibrating) {
           const finalMMR = result.provisionalMMR;
           setRevealNewMMR(finalMMR);
@@ -338,6 +359,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
       } catch (e) { console.error(e); }
     }
 
+    // 2. XP Logic (Only if Win)
     if (isWin && user) {
       try {
         const res = await grantXp(user.id, profile?.is_premium || false, 50);
@@ -357,9 +379,11 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     }
   };
 
+  // Helpers
   async function loadProblems(ids: string[]) {
     if (!ids?.length) return;
     const { data } = await supabase.from('problems').select('*').in('id', ids);
+    // Preserve order
     setProblems(ids.map(id => data?.find((p: any) => p.id === id)).filter(Boolean));
   }
   async function fetchOpponentData(uid: string) {
@@ -372,6 +396,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
 
   // --- RENDERING ---
 
+  // 1. Lobby
   if (status === 'lobby') {
     const isUnranked = !!(profile && !profile.has_calibrated);
     const calibPlayed = profile?.calibration_matches_played ?? 0;
@@ -381,13 +406,18 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
         {showRevealModal && revealRank && revealNewMMR !== null && revealOldMMR !== null && (
           <RankUpModal newRank={revealRank} oldMMR={revealOldMMR} newMMR={revealNewMMR} onClose={() => setShowRevealModal(false)} />
         )}
+        
+        {/* Модалка с легендой рангов */}
         {showRankLegend && <RankLegendModal onClose={() => setShowRankLegend(false)} />}
 
         <div className="flex items-center justify-center h-full animate-in fade-in duration-300">
           <div className="text-center space-y-8 max-w-md w-full p-8 bg-slate-800/50 rounded-2xl border border-red-500/30 shadow-2xl relative">
+            
+            {/* ЕДИНСТВЕННАЯ КНОПКА ИНФО В УГЛУ */}
             <button 
               onClick={() => setShowRankLegend(true)}
               className="absolute top-4 right-4 p-2 bg-slate-700/50 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-all border border-white/5"
+              title="Инфо о рангах"
             >
               <Info className="w-5 h-5" />
             </button>
@@ -395,12 +425,14 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
             <div className="mx-auto w-24 h-24 bg-red-500/20 rounded-full flex items-center justify-center animate-pulse">
               <Zap className="w-12 h-12 text-red-500" />
             </div>
+
             <div>
               <h1 className="text-4xl font-black text-white italic uppercase mb-2">{t('pvp.title')}</h1>
               <p className="text-red-300/60">{t('pvp.subtitle')}</p>
             </div>
+
             <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700">
-              <div className="text-sm text-slate-400 mb-1">{t('pvp.rating')}</div>
+              <div className="text-sm text-slate-400 mb-1">{t('pvp.status')}</div>
               <div className="text-2xl font-bold text-white">
                 {isUnranked ? (
                   <span className="text-yellow-400 flex items-center justify-center gap-2">
@@ -413,9 +445,16 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
                 )}
               </div>
             </div>
-            <button onClick={findMatch} className="w-full py-4 bg-gradient-to-r from-red-600 to-orange-600 rounded-xl font-bold text-white text-xl hover:scale-[1.02] transition-transform shadow-lg shadow-red-500/30 flex items-center justify-center gap-2 active:scale-95">
-              <Play className="w-6 h-6 fill-current" /> {t('pvp.btn_find')}
+
+            {/* КНОПКА ПОИСКА НА ВСЮ ШИРИНУ */}
+            <button 
+              onClick={findMatch} 
+              className="w-full py-4 bg-gradient-to-r from-red-600 to-orange-600 rounded-xl font-bold text-white text-xl hover:scale-[1.02] transition-transform shadow-lg shadow-red-500/30 flex items-center justify-center gap-2 active:scale-95"
+            >
+              <Play className="w-6 h-6 fill-current" />
+              {t('pvp.btn_find')}
             </button>
+
             <button onClick={onBack} className="text-slate-500 hover:text-white text-sm flex items-center justify-center gap-2 mx-auto">
               <ArrowLeft className="w-4 h-4" /> {t('pvp.btn_back')}
             </button>
@@ -425,6 +464,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     );
   }
 
+  // 2. Searching
   if (status === 'searching') {
     return (
       <div className="flex flex-col items-center justify-center h-full space-y-6 animate-in fade-in">
@@ -432,7 +472,9 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
         <h2 className="text-2xl font-bold text-white animate-pulse">
           {initialDuelId ? t('pvp.reconnecting') : t('pvp.searching')}
         </h2>
-        <div className="text-slate-400 text-sm max-w-xs text-center">{t('pvp.wish')}</div>
+        <div className="text-slate-400 text-sm max-w-xs text-center">
+          {t('pvp.wish')}
+        </div>
         <button onClick={async () => {
           if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
           if (duelId && !initialDuelId) await supabase.from('duels').delete().eq('id', duelId);
@@ -445,11 +487,11 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     );
   }
 
+  // 3. Battle (RESTORED & FIXED UI)
   if (status === 'battle') {
     const currentProb = problems[currentProbIndex];
     
-    // Выбираем вопрос в зависимости от языка
-    // Если язык 'kk' и есть перевод, берем его. Иначе берем русский.
+    // Поддержка языка: если есть перевод и выбран казахский, используем его
     const questionText = i18n.language === 'kk' && currentProb.question_kz 
       ? currentProb.question_kz 
       : currentProb.question;
@@ -457,6 +499,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     return (
       <div className="flex flex-col h-[100dvh] bg-slate-900 overflow-hidden">
         
+        {/* Modals & Alerts */}
         {showSurrenderModal && (
           <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-slate-900 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full">
@@ -479,7 +522,10 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
           </div>
         )}
 
+        {/* --- STICKY TOP: SCOREBOARD --- */}
         <div className="flex-shrink-0 bg-slate-900 border-b border-slate-800 shadow-lg z-10">
+          
+          {/* Scoreboard */}
           <div className="flex items-center justify-between px-3 py-2 bg-slate-800/80 border-b border-slate-700">
             <button onClick={() => setShowSurrenderModal(true)} className="p-1.5 text-red-500/50 hover:text-red-500 rounded-lg">
               <Flag className="w-4 h-4" />
@@ -501,6 +547,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
             </div>
           </div>
 
+          {/* Progress Bars */}
           <div className="space-y-1 px-3 py-2 bg-slate-900">
              <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
                <div className="h-full bg-cyan-500 transition-all duration-300" style={{ width: `${(currentProbIndex / (problems.length || 10)) * 100}%` }} />
@@ -511,13 +558,18 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
           </div>
         </div>
 
+        {/* --- MIDDLE: TASK (Centered & Large) --- */}
         <div className="flex-1 flex flex-col items-center justify-center p-4 bg-slate-900 overflow-y-auto">
           {currentProb ? (
              <div className="w-full max-w-lg">
+                {/* Карточка задачи с увеличенным шрифтом */}
                 <div className="bg-slate-800/50 backdrop-blur-sm border border-cyan-500/20 rounded-2xl p-6 shadow-xl text-center min-h-[150px] flex flex-col items-center justify-center">
                   <div className="text-2xl md:text-3xl font-bold text-white leading-relaxed tracking-wide">
+                    {/* LaTeX рендеринг (ИСПРАВЛЕНО: добавлены $) */}
                     <Latex>{`$${questionText}$`}</Latex>
                   </div>
+                  
+                  {/* Подсказка для типа задачи */}
                   <div className="mt-4 text-xs text-slate-500 font-mono uppercase tracking-widest">
                     {t('pvp.solve_hint')}
                   </div>
@@ -531,6 +583,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
           )}
         </div>
 
+        {/* --- BOTTOM: INPUT & KEYPAD --- */}
         <div className="flex-shrink-0 bg-slate-900 border-t border-slate-800 shadow-2xl z-20 pb-safe">
           {feedback ? (
             <div className={`p-8 flex flex-col items-center justify-center h-[320px] animate-in zoom-in duration-200 ${feedback === 'correct' ? 'bg-emerald-900/20' : 'bg-red-900/20'}`}>
@@ -541,7 +594,12 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
           ) : (
             <div className="p-2">
                <div className="mb-2 px-1">
-                 <MathInput value={userAnswer} onChange={setUserAnswer} onSubmit={handleAnswer} mfRef={mfRef} />
+                 <MathInput
+                   value={userAnswer}
+                   onChange={setUserAnswer}
+                   onSubmit={handleAnswer}
+                   mfRef={mfRef}
+                 />
                </div>
                <MathKeypad {...keypadProps} />
             </div>
@@ -551,6 +609,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     );
   }
 
+  // 4. Finished
   if (status === 'finished') {
     const isWin = winner === 'me';
     const isCalibrating = profile?.is_calibrating;
@@ -562,15 +621,17 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
             <>
               <Trophy className="w-20 h-20 text-yellow-400 mx-auto mb-4 drop-shadow-lg" />
               <h1 className="text-4xl font-black text-yellow-400 mb-2">{t('pvp.win')}</h1>
+              
               {xpGained && (
                 <div className="inline-flex items-center gap-2 px-4 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-amber-400 font-bold mb-4">
                    <Zap className="w-4 h-4 fill-current" /> +{xpGained} XP
                 </div>
               )}
-              {isCalibrating ? (
-                <p className="text-slate-300 font-mono mb-6">{t('pvp.calib_recorded')}</p>
+
+              {opponentDisconnected && !isBotMatch ? (
+                 <p className="text-emerald-300 mb-6 text-sm">{t('pvp.opponent_resigned')}</p>
               ) : (
-                <p className="text-emerald-400 font-bold text-lg mb-6 animate-pulse">+ {mmrChange} MP</p>
+                 <p className="text-emerald-400 font-bold text-lg mb-6 animate-pulse">+ {mmrChange} MP</p>
               )}
             </>
           ) : (
