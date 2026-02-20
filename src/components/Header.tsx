@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Menu, User, Trophy, MonitorPlay, Home, Bell, Zap, GraduationCap } from 'lucide-react'; // Импорт Zap и GraduationCap
+import { Menu, User, Trophy, MonitorPlay, Home, Bell, Zap, GraduationCap } from 'lucide-react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { Profile, supabase } from '../lib/supabase';
 import { getRank, getLevelProgress } from '../lib/gameLogic';
 import { NotificationsModal } from './NotificationsModal';
+import { LanguageSwitcher } from './LanguageSwitcher'; // <--- 1. ДОБАВЛЕН ИМПОРТ
 
 type Props = {
   user: SupabaseUser | null;
@@ -26,8 +27,8 @@ export function Header({
   const currentRank = profile ? getRank(profile.clearance_level, profile.role) : { title: 'Гость', color: 'text-slate-400' };
   const progressPercent = profile ? getLevelProgress(profile.total_experiments) : 0;
 
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const = useState(false);
+  const = useState(0);
 
   useEffect(() => {
     if (!user) return;
@@ -50,7 +51,7 @@ export function Header({
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [user]);
+  },);
 
   return (
     <>
@@ -77,6 +78,10 @@ export function Header({
           </button>
 
           <div className="flex items-center gap-2 md:gap-4">
+            
+            {/* === 2. СЮДА ВСТАВЛЕН ПЕРЕКЛЮЧАТЕЛЬ ЯЗЫКА === */}
+            <LanguageSwitcher />
+
             {user ? (
               <>
                   <button 
@@ -123,8 +128,8 @@ export function Header({
                   <button onClick={onShowDashboard} className="flex items-center gap-2 pl-2 border-l border-slate-700/50 ml-1">
                     <div className="flex flex-col items-end">
                       <div className="flex items-center gap-1.5">
-                        <span className={`text-[10px] md:text-xs font-bold uppercase ${currentRank?.color}`}>
-                          {currentRank?.title.split(' ')[0]}
+                        <span className={`text- md:text-xs font-bold uppercase ${currentRank?.color}`}>
+                          {currentRank?.title.split(' ')}
                         </span>
                         
                         {/* ИКОНКИ PREMIUM / TEACHER */}
@@ -140,7 +145,7 @@ export function Header({
                         )}
                       </div>
 
-                      <span className="hidden md:block text-white font-medium text-sm leading-none max-w-[80px] truncate">{profile?.username}</span>
+                      <span className="hidden md:block text-white font-medium text-sm leading-none max-w- truncate">{profile?.username}</span>
                       <div className="w-12 md:w-full h-1 bg-slate-800 rounded-full overflow-hidden mt-1">
                         <div className="h-full bg-cyan-400 transition-all duration-500" style={{ width: `${progressPercent}%` }} />
                       </div>
