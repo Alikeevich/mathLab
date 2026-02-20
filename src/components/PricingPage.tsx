@@ -53,7 +53,7 @@ export function PricingPage() {
         return;
       }
 
-      paddle.Checkout.open({
+    paddle.Checkout.open({
         items: [{ priceId: priceId, quantity: 1 }],
         customData: {
           userId: user.id,
