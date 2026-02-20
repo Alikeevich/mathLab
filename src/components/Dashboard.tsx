@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next'; // Перевод
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, Achievement } from '../lib/supabase';
 import {
@@ -41,7 +42,9 @@ const typeTranslations: Record<string, string> = {
 };
 
 export function Dashboard({ onClose }: DashboardProps) {
+  const { t } = useTranslation();
   const { profile, signOut, refreshProfile } = useAuth();
+  
   const [achievements, setAchievements] = useState<UserAchievement[]>([]);
   const [recentExperiments, setRecentExperiments] = useState<RecentExperiment[]>([]);
   const [showTeacherModal, setShowTeacherModal] = useState(false);
@@ -56,7 +59,6 @@ export function Dashboard({ onClose }: DashboardProps) {
     
     if (!profile) return;
     
-    // Realtime подписка на статус заявки
     const channel = supabase
       .channel('teacher-status-changes')
       .on(
@@ -131,7 +133,6 @@ export function Dashboard({ onClose }: DashboardProps) {
   }
 
   const handleTeacherPaymentRedirect = () => {
-    // Редирект на страницу цен
     window.location.href = "/pricing";
   };
 
@@ -147,18 +148,18 @@ export function Dashboard({ onClose }: DashboardProps) {
 
   // === ЛОГИКА ОТОБРАЖЕНИЯ РОЛИ ===
   const getRoleDisplay = () => {
-    if (!profile) return { label: 'Guest', color: 'text-slate-400', icon: User, bg: 'bg-slate-700' };
+    if (!profile) return { label: t('dashboard.role_guest'), color: 'text-slate-400', icon: User, bg: 'bg-slate-700' };
 
     if (profile.role === 'admin') {
-      return { label: 'ADMINISTRATOR', color: 'text-red-400', icon: Shield, bg: 'bg-red-500/10 border-red-500/50' };
+      return { label: t('dashboard.role_admin'), color: 'text-red-400', icon: Shield, bg: 'bg-red-500/10 border-red-500/50' };
     }
     if (profile.role === 'teacher') {
-      return { label: 'MENTOR', color: 'text-cyan-400', icon: GraduationCap, bg: 'bg-cyan-500/10 border-cyan-500/50' };
+      return { label: t('dashboard.role_mentor'), color: 'text-cyan-400', icon: GraduationCap, bg: 'bg-cyan-500/10 border-cyan-500/50' };
     }
     if (profile.is_premium) {
-      return { label: 'PREMIUM AGENT', color: 'text-amber-400', icon: Zap, bg: 'bg-amber-500/10 border-amber-500/50' };
+      return { label: t('dashboard.role_premium'), color: 'text-amber-400', icon: Zap, bg: 'bg-amber-500/10 border-amber-500/50' };
     }
-    return { label: 'CADET', color: 'text-slate-300', icon: User, bg: 'bg-slate-800 border-slate-700' };
+    return { label: t('dashboard.role_cadet'), color: 'text-slate-300', icon: User, bg: 'bg-slate-800 border-slate-700' };
   };
 
   const roleInfo = getRoleDisplay();
@@ -172,7 +173,7 @@ export function Dashboard({ onClose }: DashboardProps) {
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-black text-white uppercase tracking-tighter flex items-center gap-2">
             <User className="w-8 h-8 text-cyan-500" />
-            Личное Дело
+            {t('dashboard.title')}
           </h1>
           <button onClick={onClose} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full transition-colors text-slate-400 hover:text-white">
             <X className="w-6 h-6" />
@@ -184,17 +185,14 @@ export function Dashboard({ onClose }: DashboardProps) {
             
             {/* === MAIN ID CARD === */}
             <div className={`p-6 rounded-3xl border ${roleInfo.bg} relative overflow-hidden shadow-2xl`}>
-              {/* Фоновые элементы */}
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
               
               <div className="flex flex-col md:flex-row gap-6 items-center md:items-start relative z-10">
                 
-                {/* Аватар / Иконка роли */}
                 <div className={`w-24 h-24 rounded-2xl flex items-center justify-center shrink-0 border-2 ${roleInfo.color.replace('text', 'border')} bg-slate-900/50 shadow-lg`}>
                    <RoleIcon className={`w-12 h-12 ${roleInfo.color}`} />
                 </div>
 
-                {/* Инфо о пользователе */}
                 <div className="flex-1 text-center md:text-left">
                   <div className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-2 border ${roleInfo.bg} ${roleInfo.color}`}>
                     {roleInfo.label}
@@ -208,10 +206,9 @@ export function Dashboard({ onClose }: DashboardProps) {
                       onClick={handleSignOut}
                       className="px-4 py-2 bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-400 border border-slate-700 hover:border-red-500/30 rounded-lg transition-all font-bold text-sm flex items-center gap-2"
                     >
-                      <LogOut className="w-4 h-4" /> Выход
+                      <LogOut className="w-4 h-4" /> {t('dashboard.logout')}
                     </button>
 
-                    {/* Логика "Стать учителем" */}
                     {profile.role !== 'teacher' && profile.role !== 'admin' && (
                       <>
                         {teacherRequestStatus === 'none' && (
@@ -219,12 +216,12 @@ export function Dashboard({ onClose }: DashboardProps) {
                             onClick={() => setShowTeacherModal(true)}
                             className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white border border-slate-600 rounded-lg transition-colors font-bold text-sm flex items-center gap-2"
                           >
-                            <GraduationCap className="w-4 h-4" /> Стать учителем
+                            <GraduationCap className="w-4 h-4" /> {t('dashboard.become_teacher')}
                           </button>
                         )}
                         {teacherRequestStatus === 'pending' && (
                           <div className="px-4 py-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-lg font-bold text-sm flex items-center gap-2 animate-pulse cursor-wait">
-                            <Clock className="w-4 h-4" /> Заявка на проверке
+                            <Clock className="w-4 h-4" /> {t('dashboard.teacher_pending')}
                           </div>
                         )}
                         {teacherRequestStatus === 'approved' && (
@@ -232,7 +229,7 @@ export function Dashboard({ onClose }: DashboardProps) {
                             onClick={handleTeacherPaymentRedirect}
                             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-sm flex items-center gap-2 shadow-lg shadow-emerald-900/20 animate-pulse"
                           >
-                            <CreditCard className="w-4 h-4" /> Активировать статус
+                            <CreditCard className="w-4 h-4" /> {t('dashboard.activate_status')}
                           </button>
                         )}
                         {teacherRequestStatus === 'rejected' && (
@@ -240,7 +237,7 @@ export function Dashboard({ onClose }: DashboardProps) {
                             onClick={() => setShowTeacherModal(true)}
                             className="px-4 py-2 bg-red-900/20 text-red-400 border border-red-500/30 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-red-900/40"
                           >
-                            <XCircle className="w-4 h-4" /> Заявка отклонена. Повторить?
+                            <XCircle className="w-4 h-4" /> {t('dashboard.rejected')}
                           </button>
                         )}
                       </>
@@ -248,7 +245,6 @@ export function Dashboard({ onClose }: DashboardProps) {
                   </div>
                 </div>
 
-                {/* Компаньон */}
                 {profile.companion_name && (
                   <div className="hidden md:flex flex-col items-center bg-slate-900/50 p-4 rounded-2xl border border-white/5">
                     <img src="/meerkat/avatar.png" alt="Pet" className="w-16 h-16 object-contain mb-2" />
@@ -266,7 +262,7 @@ export function Dashboard({ onClose }: DashboardProps) {
                   <Target className="w-6 h-6" />
                 </div>
                 <div>
-                  <div className="text-xs text-slate-400 uppercase font-bold tracking-wider">Уровень</div>
+                  <div className="text-xs text-slate-400 uppercase font-bold tracking-wider">{t('dashboard.level')}</div>
                   <div className="text-2xl font-black text-white">{profile.clearance_level}</div>
                 </div>
               </div>
@@ -276,7 +272,7 @@ export function Dashboard({ onClose }: DashboardProps) {
                   <Zap className="w-6 h-6" />
                 </div>
                 <div>
-                  <div className="text-xs text-slate-400 uppercase font-bold tracking-wider">Задач решено</div>
+                  <div className="text-xs text-slate-400 uppercase font-bold tracking-wider">{t('dashboard.solved')}</div>
                   <div className="text-2xl font-black text-white">{profile.total_experiments}</div>
                 </div>
               </div>
@@ -286,7 +282,7 @@ export function Dashboard({ onClose }: DashboardProps) {
                   <TrendingUp className="w-6 h-6" />
                 </div>
                 <div>
-                  <div className="text-xs text-slate-400 uppercase font-bold tracking-wider">Точность</div>
+                  <div className="text-xs text-slate-400 uppercase font-bold tracking-wider">{t('dashboard.accuracy')}</div>
                   <div className="text-2xl font-black text-white">{profile.success_rate.toFixed(0)}%</div>
                 </div>
               </div>
@@ -298,7 +294,7 @@ export function Dashboard({ onClose }: DashboardProps) {
               <div>
                 <div className="flex items-center gap-2 mb-4 px-1">
                   <Trophy className="w-5 h-5 text-amber-400" />
-                  <h2 className="text-lg font-bold text-white uppercase tracking-tight">Достижения</h2>
+                  <h2 className="text-lg font-bold text-white uppercase tracking-tight">{t('dashboard.achievements')}</h2>
                 </div>
                 <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 min-h-[200px]">
                   <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
@@ -315,7 +311,7 @@ export function Dashboard({ onClose }: DashboardProps) {
                         </div>
                       ))
                     ) : (
-                      <div className="text-center py-12 text-slate-600 text-sm italic">Нет наград</div>
+                      <div className="text-center py-12 text-slate-600 text-sm italic">{t('dashboard.no_awards')}</div>
                     )}
                   </div>
                 </div>
@@ -324,7 +320,7 @@ export function Dashboard({ onClose }: DashboardProps) {
               <div>
                 <div className="flex items-center gap-2 mb-4 px-1">
                   <Clock className="w-5 h-5 text-cyan-400" />
-                  <h2 className="text-lg font-bold text-white uppercase tracking-tight">Последняя активность</h2>
+                  <h2 className="text-lg font-bold text-white uppercase tracking-tight">{t('dashboard.history')}</h2>
                 </div>
                 <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 min-h-[200px]">
                   <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
@@ -341,7 +337,7 @@ export function Dashboard({ onClose }: DashboardProps) {
                         </div>
                       ))
                     ) : (
-                      <div className="text-center py-12 text-slate-600 text-sm italic">Журнал пуст</div>
+                      <div className="text-center py-12 text-slate-600 text-sm italic">{t('dashboard.empty_log')}</div>
                     )}
                   </div>
                 </div>
@@ -350,7 +346,7 @@ export function Dashboard({ onClose }: DashboardProps) {
 
             <div className="pt-6 border-t border-slate-800 flex justify-center">
               <a href="mailto:support@mathlabpvp.org" className="flex items-center gap-2 text-slate-500 hover:text-cyan-400 transition-all text-xs font-bold uppercase tracking-widest">
-                <Mail className="w-4 h-4" /> Служба поддержки
+                <Mail className="w-4 h-4" /> {t('dashboard.support')}
               </a>
             </div>
           </div>
