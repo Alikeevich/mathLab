@@ -4,38 +4,6 @@ import { initReactI18next } from 'react-i18next';
 const resources = {
   ru: {
     translation: {
-      reactor: {
-        back: "Назад",
-        demo_limit: "ДЕМО",
-        title: "Реактор",
-        error_work: "Работа над ошибками",
-        module: "Модуль",
-        experiments: "Опытов",
-        success: "Успех",
-        efficiency: "КПД",
-        status_active: "СТАТУС: АКТИВЕН",
-        input_solution: "Ввод решения",
-        suricat: "Сурикат",
-        correct: "Абсолютно верно!",
-        incorrect: "Ошибка в расчетах",
-        correct_answer: "Правильный ответ:",
-        module_finished: "Задачи в этом модуле закончились",
-        demo_finished_title: "Демо-режим завершен",
-        demo_finished_desc: "Создайте аккаунт для продолжения.",
-        create_account: "Создать аккаунт",
-        return: "Вернуться"
-      },
-      modules: {
-        back_to_map: "К карте секторов",
-        sector: "СЕКТОР",
-        demo_lock: "Вы в демо-режиме. Вам открыт только первый модуль для ознакомления.",
-        progress: "ПРОГРЕСС",
-        no_save: "ПРОГРЕСС НЕ СОХРАНЯЕТСЯ",
-        start: "Начать",
-        continue: "Продолжить",
-        locked: "Заблокировано",
-        loading: "Данные сектора загружаются..."
-      },
       header: {
         subtitle: "PvP Arena",
         archive: "Архив Знаний",
@@ -124,6 +92,8 @@ const resources = {
         subtitle: "Инвестируй в свои знания",
         back: "Вернуться в игру",
         hit: "Хит продаж",
+        per_month: "/ месяц",
+        per_forever: "/ навсегда",
         plan_cadet_desc: "Идеально для старта и знакомства с платформой.",
         plan_premium_desc: "Для тех, кто хочет учиться эффективно и быстро.",
         plan_teacher_desc: "Инструменты для учителей и организаторов.",
@@ -138,8 +108,23 @@ const resources = {
         loading: "Загрузка...",
         already_bought: "Уже куплено",
         footer_rights: "Все права защищены.",
-        features_free: "Доступ к PvP арене",
-        features_prem: "Журнал ошибок"
+        // ФИЧИ
+        feat_pvp: "Доступ к PvP арене",
+        feat_suricat: "Персональный Сурикат",
+        feat_modules: "Базовые модули",
+        feat_errors: "Журнал ошибок",
+        feat_xp: "Ускоренная прокачка (XP)",
+        feat_tournaments: "Создание турниров",
+        feat_all_free: "Всё, что в Free",
+        feat_x2_xp: "x2 опыт (XP) для Суриката",
+        feat_badge: "Уникальный значок профиля",
+        feat_priority: "Приоритет в поиске соперников",
+        feat_custom_tasks: "Добавление своих задач",
+        feat_all_premium: "Всё, что в Premium",
+        feat_closed_tour: "Создание закрытых турниров",
+        feat_site_tasks: "Добавление своих задач на сайт",
+        feat_analytics: "Панель аналитики учеников",
+        feat_teacher_status: "Специальный статус \"Teacher\""
       },
       dashboard: {
         title: "Личное Дело",
@@ -161,43 +146,43 @@ const resources = {
         role_premium: "PREMIUM AGENT",
         role_cadet: "CADET",
         role_guest: "GUEST"
+      },
+      reactor: {
+        back: "Назад",
+        demo_limit: "ДЕМО",
+        title: "Реактор",
+        error_work: "Работа над ошибками",
+        module: "Модуль",
+        experiments: "Опытов",
+        success: "Успех",
+        efficiency: "КПД",
+        status_active: "СТАТУС: АКТИВЕН",
+        input_solution: "Ввод решения",
+        suricat: "Сурикат",
+        correct: "Абсолютно верно!",
+        incorrect: "Ошибка в расчетах",
+        correct_answer: "Правильный ответ:",
+        module_finished: "Задачи в этом модуле закончились",
+        demo_finished_title: "Демо-режим завершен",
+        demo_finished_desc: "Создайте аккаунт для продолжения.",
+        create_account: "Создать аккаунт",
+        return: "Вернуться"
+      },
+      modules: {
+        back_to_map: "К карте секторов",
+        sector: "СЕКТОР",
+        demo_lock: "Вы в демо-режиме. Вам открыт только первый модуль для ознакомления.",
+        progress: "ПРОГРЕСС",
+        no_save: "ПРОГРЕСС НЕ СОХРАНЯЕТСЯ",
+        start: "Начать",
+        continue: "Продолжить",
+        locked: "Заблокировано",
+        loading: "Данные сектора загружаются..."
       }
     }
   },
   kk: {
     translation: {
-      reactor: {
-        back: "Артқа",
-        demo_limit: "ДЕМО",
-        title: "Реактор",
-        error_work: "Қателермен жұмыс",
-        module: "Модуль",
-        experiments: "Тәжірибелер",
-        success: "Сәттілік",
-        efficiency: "ПӘК",
-        status_active: "СТАТУС: БЕЛСЕНДІ",
-        input_solution: "Шешімді енгізу",
-        suricat: "Сурикат",
-        correct: "Өте дұрыс!",
-        incorrect: "Есептеуде қате бар",
-        correct_answer: "Дұрыс жауап:",
-        module_finished: "Бұл модульдегі есептер таусылды",
-        demo_finished_title: "Демо-режим аяқталды",
-        demo_finished_desc: "Жалғастыру үшін аккаунт ашыңыз.",
-        create_account: "Аккаунт ашу",
-        return: "Оралу"
-      },
-      modules: {
-        back_to_map: "Секторлар картасына",
-        sector: "СЕКТОР",
-        demo_lock: "Сіз демо-режимдесіз. Танысу үшін тек бірінші модуль ашық.",
-        progress: "ПРОГРЕСС",
-        no_save: "ПРОГРЕСС САҚТАЛМАЙДЫ",
-        start: "Бастау",
-        continue: "Жалғастыру",
-        locked: "Бұғатталған",
-        loading: "Сектор деректері жүктелуде..."
-      },
       header: {
         subtitle: "PvP Аренасы",
         archive: "Білім мұрағаты",
@@ -286,6 +271,8 @@ const resources = {
         subtitle: "Біліміңе инвестиция сал",
         back: "Ойынға оралу",
         hit: "Хит сатылым",
+        per_month: "/ ай",
+        per_forever: "/ мәңгілік",
         plan_cadet_desc: "Платформамен танысу және бастау үшін өте қолайлы.",
         plan_premium_desc: "Тиімді және жылдам үйренгісі келетіндер үшін.",
         plan_teacher_desc: "Мұғалімдер мен ұйымдастырушыларға арналған құралдар.",
@@ -300,8 +287,23 @@ const resources = {
         loading: "Жүктелуде...",
         already_bought: "Сатып алынды",
         footer_rights: "Барлық құқықтар қорғалған.",
-        features_free: "PvP аренаға кіру",
-        features_prem: "Қателер журналы"
+        // ФИЧИ
+        feat_pvp: "PvP аренаға кіру",
+        feat_suricat: "Жеке Сурикат",
+        feat_modules: "Базалық модульдер",
+        feat_errors: "Қателер журналы",
+        feat_xp: "Жылдам даму (XP)",
+        feat_tournaments: "Турнирлер құру",
+        feat_all_free: "Free пакетіндегі барлығы",
+        feat_x2_xp: "Сурикат үшін x2 тәжірибе (XP)",
+        feat_badge: "Профильдің бірегей белгісі",
+        feat_priority: "Қарсыластарды іздеудегі басымдық",
+        feat_custom_tasks: "Өз есептеріңізді қосу",
+        feat_all_premium: "Premium-дағы барлық мүмкіндіктер",
+        feat_closed_tour: "Жабық турнирлер құру",
+        feat_site_tasks: "Сайтқа өз есептеріңізді қосу",
+        feat_analytics: "Оқушылар талдау тақтасы",
+        feat_teacher_status: "\"Teacher\" арнайы мәртебесі"
       },
       dashboard: {
         title: "Жеке іс",
@@ -323,6 +325,38 @@ const resources = {
         role_premium: "PREMIUM АГЕНТ",
         role_cadet: "КУРСАНТ",
         role_guest: "ҚОНАҚ"
+      },
+      reactor: {
+        back: "Артқа",
+        demo_limit: "ДЕМО",
+        title: "Реактор",
+        error_work: "Қателермен жұмыс",
+        module: "Модуль",
+        experiments: "Тәжірибелер",
+        success: "Сәттілік",
+        efficiency: "ПӘК",
+        status_active: "СТАТУС: БЕЛСЕНДІ",
+        input_solution: "Шешімді енгізу",
+        suricat: "Сурикат",
+        correct: "Өте дұрыс!",
+        incorrect: "Есептеуде қате бар",
+        correct_answer: "Дұрыс жауап:",
+        module_finished: "Бұл модульдегі есептер таусылды",
+        demo_finished_title: "Демо-режим аяқталды",
+        demo_finished_desc: "Жалғастыру үшін аккаунт ашыңыз.",
+        create_account: "Аккаунт ашу",
+        return: "Оралу"
+      },
+      modules: {
+        back_to_map: "Секторлар картасына",
+        sector: "СЕКТОР",
+        demo_lock: "Сіз демо-режимдесіз. Танысу үшін тек бірінші модуль ашық.",
+        progress: "ПРОГРЕСС",
+        no_save: "ПРОГРЕСС САҚТАЛМАЙДЫ",
+        start: "Бастау",
+        continue: "Жалғастыру",
+        locked: "Бұғатталған",
+        loading: "Сектор деректері жүктелуде..."
       }
     }
   }
