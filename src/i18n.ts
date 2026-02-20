@@ -4,6 +4,38 @@ import { initReactI18next } from 'react-i18next';
 const resources = {
   ru: {
     translation: {
+      reactor: {
+        back: "Назад",
+        demo_limit: "ДЕМО",
+        title: "Реактор",
+        error_work: "Работа над ошибками",
+        module: "Модуль",
+        experiments: "Опытов",
+        success: "Успех",
+        efficiency: "КПД",
+        status_active: "СТАТУС: АКТИВЕН",
+        input_solution: "Ввод решения",
+        suricat: "Сурикат",
+        correct: "Абсолютно верно!",
+        incorrect: "Ошибка в расчетах",
+        correct_answer: "Правильный ответ:",
+        module_finished: "Задачи в этом модуле закончились",
+        demo_finished_title: "Демо-режим завершен",
+        demo_finished_desc: "Создайте аккаунт для продолжения.",
+        create_account: "Создать аккаунт",
+        return: "Вернуться"
+      },
+      modules: {
+        back_to_map: "К карте секторов",
+        sector: "СЕКТОР",
+        demo_lock: "Вы в демо-режиме. Вам открыт только первый модуль для ознакомления.",
+        progress: "ПРОГРЕСС",
+        no_save: "ПРОГРЕСС НЕ СОХРАНЯЕТСЯ",
+        start: "Начать",
+        continue: "Продолжить",
+        locked: "Заблокировано",
+        loading: "Данные сектора загружаются..."
+      },
       header: {
         subtitle: "PvP Arena",
         archive: "Архив Знаний",
