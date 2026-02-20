@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Menu, User, Trophy, MonitorPlay, Home, Bell, Zap, GraduationCap } from 'lucide-react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { Profile, supabase } from '../lib/supabase';
@@ -23,8 +24,9 @@ export function Header({
   onShowCompanion, onShowArchive, onShowLeaderboard, onShowDashboard,
   onExitGuest, onShowAuth 
 }: Props) {
+  const { t } = useTranslation();
 
-  const currentRank = profile ? getRank(profile.clearance_level, profile.role) : { title: 'Гость', color: 'text-slate-400' };
+  const currentRank = profile ? getRank(profile.clearance_level, profile.role) : { title: t('header.guest'), color: 'text-slate-400' };
   const progressPercent = profile ? getLevelProgress(profile.total_experiments) : 0;
 
   const [showNotifications, setShowNotifications] = useState(false);
@@ -51,7 +53,7 @@ export function Header({
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  },);
+  }, [user]);
 
   return (
     <>
@@ -73,13 +75,13 @@ export function Header({
 
             <div className="hidden sm:block text-left">
               <h1 className="text-xl font-bold text-white leading-tight">MathLab</h1>
-              <p className="text-cyan-400/60 text-xs font-mono">PvP Arena</p>
+              <p className="text-cyan-400/60 text-xs font-mono">{t('header.subtitle')}</p>
             </div>
           </button>
 
           <div className="flex items-center gap-2 md:gap-4">
             
-            {/* === 2. СЮДА ВСТАВЛЕН ПЕРЕКЛЮЧАТЕЛЬ ЯЗЫКА === */}
+            {/* Переключатель языка */}
             <LanguageSwitcher />
 
             {user ? (
@@ -117,22 +119,21 @@ export function Header({
                     </button>
                   )}
 
-                  <button onClick={onShowArchive} className="p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg hover:bg-cyan-500/20 transition-colors group" title="Архив Знаний">
+                  <button onClick={onShowArchive} className="p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg hover:bg-cyan-500/20 transition-colors group" title={t('header.archive')}>
                     <MonitorPlay className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition-transform" />
                   </button>
 
-                  <button onClick={onShowLeaderboard} className="p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-colors group" title="Рейтинг">
+                  <button onClick={onShowLeaderboard} className="p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-colors group" title={t('header.leaderboard')}>
                     <Trophy className="w-5 h-5 text-amber-400 group-hover:scale-110 transition-transform" />
                   </button>
 
                   <button onClick={onShowDashboard} className="flex items-center gap-2 pl-2 border-l border-slate-700/50 ml-1">
                     <div className="flex flex-col items-end">
                       <div className="flex items-center gap-1.5">
-                        <span className={`text- md:text-xs font-bold uppercase ${currentRank?.color}`}>
-                          {currentRank?.title.split(' ')}
+                        <span className={`text-[10px] md:text-xs font-bold uppercase ${currentRank?.color}`}>
+                          {currentRank?.title.split(' ')[0]}
                         </span>
                         
-                        {/* ИКОНКИ PREMIUM / TEACHER */}
                         {profile?.is_premium && profile.role !== 'teacher' && (
                           <div className="bg-amber-500/20 p-0.5 rounded border border-amber-500/50" title="Premium">
                             <Zap className="w-2.5 h-2.5 text-amber-400 fill-current" />
@@ -145,7 +146,7 @@ export function Header({
                         )}
                       </div>
 
-                      <span className="hidden md:block text-white font-medium text-sm leading-none max-w- truncate">{profile?.username}</span>
+                      <span className="hidden md:block text-white font-medium text-sm leading-none max-w-[80px] truncate">{profile?.username}</span>
                       <div className="w-12 md:w-full h-1 bg-slate-800 rounded-full overflow-hidden mt-1">
                         <div className="h-full bg-cyan-400 transition-all duration-500" style={{ width: `${progressPercent}%` }} />
                       </div>
@@ -157,11 +158,11 @@ export function Header({
               </>
             ) : (
               <div className="flex gap-3 items-center">
-                <button onClick={onExitGuest} className="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-slate-400 hover:text-white transition-colors" title="На главную">
+                <button onClick={onExitGuest} className="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-slate-400 hover:text-white transition-colors" title={t('header.home_title')}>
                   <Home className="w-5 h-5" />
                 </button>
                 <button onClick={onShowAuth} className="px-6 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg transition-colors shadow-lg shadow-cyan-900/20">
-                  Войти
+                  {t('header.login_btn')}
                 </button>
               </div>
             )}
