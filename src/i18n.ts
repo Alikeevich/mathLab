@@ -166,6 +166,38 @@ const resources = {
   },
   kk: {
     translation: {
+      reactor: {
+        back: "Артқа",
+        demo_limit: "ДЕМО",
+        title: "Реактор",
+        error_work: "Қателермен жұмыс",
+        module: "Модуль",
+        experiments: "Тәжірибелер",
+        success: "Сәттілік",
+        efficiency: "ПӘК",
+        status_active: "СТАТУС: БЕЛСЕНДІ",
+        input_solution: "Шешімді енгізу",
+        suricat: "Сурикат",
+        correct: "Өте дұрыс!",
+        incorrect: "Есептеуде қате бар",
+        correct_answer: "Дұрыс жауап:",
+        module_finished: "Бұл модульдегі есептер таусылды",
+        demo_finished_title: "Демо-режим аяқталды",
+        demo_finished_desc: "Жалғастыру үшін аккаунт ашыңыз.",
+        create_account: "Аккаунт ашу",
+        return: "Оралу"
+      },
+      modules: {
+        back_to_map: "Секторлар картасына",
+        sector: "СЕКТОР",
+        demo_lock: "Сіз демо-режимдесіз. Танысу үшін тек бірінші модуль ашық.",
+        progress: "ПРОГРЕСС",
+        no_save: "ПРОГРЕСС САҚТАЛМАЙДЫ",
+        start: "Бастау",
+        continue: "Жалғастыру",
+        locked: "Бұғатталған",
+        loading: "Сектор деректері жүктелуде..."
+      },
       header: {
         subtitle: "PvP Аренасы",
         archive: "Білім мұрағаты",
