@@ -108,6 +108,12 @@ const resources = {
         loading: "Загрузка...",
         already_bought: "Уже куплено",
         footer_rights: "Все права защищены.",
+        refund: "Возврат средств",
+        teacher_req_docs: "Требуется подтверждение документов",
+        teacher_approved_pay: "Верификация пройдена! Оплатите для доступа.",
+        alert_login: "Пожалуйста, войдите в аккаунт.",
+        alert_paddle_init: "Ошибка инициализации платежной системы",
+        alert_paddle_open: "Не удалось открыть окно оплаты.",
         // ФИЧИ
         feat_pvp: "Доступ к PvP арене",
         feat_suricat: "Персональный Сурикат",
@@ -266,7 +272,7 @@ const resources = {
         calib_recorded: "Калибрлеу матчы жазылды.",
         result_recorded: "Нәтиже калибрлеуде ескерілді."
       },
-      pricing: {
+    pricing: {
         title: "Тарифтер",
         subtitle: "Біліміңе инвестиция сал",
         back: "Ойынға оралу",
@@ -287,6 +293,12 @@ const resources = {
         loading: "Жүктелуде...",
         already_bought: "Сатып алынды",
         footer_rights: "Барлық құқықтар қорғалған.",
+        refund: "Қаражатты қайтару",
+        teacher_req_docs: "Құжаттарды растау қажет",
+        teacher_approved_pay: "Верификация сәтті өтті! Қолжетімділік үшін төлеңіз.",
+        alert_login: "Аккаунтқа кіріңіз.",
+        alert_paddle_init: "Төлем жүйесін іске қосу қатесі",
+        alert_paddle_open: "Төлем терезесін ашу мүмкін болмады.",
         // ФИЧИ
         feat_pvp: "PvP аренаға кіру",
         feat_suricat: "Жеке Сурикат",
