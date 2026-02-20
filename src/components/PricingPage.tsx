@@ -6,21 +6,19 @@ import { supabase } from '../lib/supabase';
 import { BecomeTeacherModal } from './BecomeTeacherModal';
 import { getPaddleInstance } from '../lib/paddle';
 
-// ID Цен из Paddle Dashboard
 const PADDLE_PRICE_IDS = {
-  PREMIUM: 'pri_01khs2jy2vbmjj09q91p38nkbf', // Убедись, что тут твои актуальные ID (pri_)
-  TEACHER: 'pri_01khs2jq904f4sxeggrd55ynr3' 
+  PREMIUM: 'pro_01khs2jy2vbmjj09q91p38nkbf', 
+  TEACHER: 'pro_01khs2jq904f4sxeggrd55ynr3' 
 };
 
 export function PricingPage() {
   const { t } = useTranslation();
   const { user, profile, refreshProfile } = useAuth();
   
-  // Состояния
   const [requestStatus, setRequestStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
   const [loading, setLoading] = useState(true);
-  const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [processingPayment, setProcessingPayment] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
 
   useEffect(() => {
     async function checkStatus() {
@@ -64,7 +62,7 @@ export function PricingPage() {
         settings: {
           displayMode: 'overlay',
           theme: 'dark',
-          locale: 'ru' // Можно менять динамически: i18n.language
+          locale: 'ru'
         }
       });
     } catch (error) {
@@ -79,17 +77,17 @@ export function PricingPage() {
     {
       name: 'Cadet',
       price: '$0',
-      period: '/ ∞',
+      period: t('pricing.per_forever'), // / навсегда
       description: t('pricing.plan_cadet_desc'),
       features: [
-        t('pricing.features_free'),
-        'Персональный Сурикат',
-        'Базовые модули'
+        t('pricing.feat_pvp'),
+        t('pricing.feat_suricat'),
+        t('pricing.feat_modules')
       ],
       notIncluded: [
-        t('pricing.features_prem'),
-        'Ускоренная прокачка (XP)',
-        'Создание турниров'
+        t('pricing.feat_errors'),
+        t('pricing.feat_xp'),
+        t('pricing.feat_tournaments')
       ],
       color: 'slate',
       icon: <Zap className="w-4 h-4" />,
@@ -99,18 +97,18 @@ export function PricingPage() {
     {
       name: 'Premium',
       price: '$7',
-      period: '/ месяц',
+      period: t('pricing.per_month'), // / месяц
       description: t('pricing.plan_premium_desc'),
       features: [
-        'Всё, что в Free',
-        t('pricing.features_prem'),
-        'x2 опыт (XP) для Суриката',
-        'Уникальный значок профиля',
-        'Приоритет в поиске соперников'
+        t('pricing.feat_all_free'),
+        t('pricing.feat_errors'),
+        t('pricing.feat_x2_xp'),
+        t('pricing.feat_badge'),
+        t('pricing.feat_priority')
       ],
       notIncluded: [
-        'Создание турниров',
-        'Добавление своих задач'
+        t('pricing.feat_tournaments'),
+        t('pricing.feat_custom_tasks')
       ],
       color: 'amber',
       icon: <Zap className="w-4 h-4" />,
@@ -134,14 +132,14 @@ export function PricingPage() {
     {
       name: 'Teacher',
       price: '$9',
-      period: '/ месяц',
+      period: t('pricing.per_month'), // / месяц
       description: t('pricing.plan_teacher_desc'),
       features: [
-        'Всё, что в Premium',
-        'Создание закрытых турниров',
-        'Добавление своих задач на сайт',
-        'Панель аналитики учеников',
-        'Специальный статус "Teacher"'
+        t('pricing.feat_all_premium'),
+        t('pricing.feat_closed_tour'),
+        t('pricing.feat_site_tasks'),
+        t('pricing.feat_analytics'),
+        t('pricing.feat_teacher_status')
       ],
       notIncluded: [],
       color: 'cyan',
@@ -182,12 +180,14 @@ export function PricingPage() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-300 font-sans selection:bg-cyan-500/30 overflow-y-auto">
+      
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-cyan-600/10 rounded-full blur-3xl" />
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 py-8 md:py-12">
+        
         <div className="flex flex-col md:flex-row items-center justify-between mb-12 gap-4">
           <div className="flex items-center gap-3">
             <div>
@@ -195,6 +195,7 @@ export function PricingPage() {
               <p className="text-slate-400 text-sm">{t('pricing.subtitle')}</p>
             </div>
           </div>
+          
           <a href="/" className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-all flex items-center gap-2 border border-slate-700">
             <ArrowLeft className="w-4 h-4" />
             {t('pricing.back')}
@@ -203,12 +204,20 @@ export function PricingPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
           {plans.map((plan) => (
-            <div key={plan.name} className={`relative flex flex-col p-8 rounded-3xl border transition-all duration-300 ${plan.highlight ? `bg-slate-800/80 border-${plan.color}-500 shadow-2xl shadow-${plan.color}-900/20 scale-100 md:scale-105 z-10` : 'bg-slate-800/40 border-slate-700 hover:border-slate-600'}`}>
+            <div 
+              key={plan.name}
+              className={`relative flex flex-col p-8 rounded-3xl border transition-all duration-300 ${
+                plan.highlight 
+                  ? `bg-slate-800/80 border-${plan.color}-500 shadow-2xl shadow-${plan.color}-900/20 scale-100 md:scale-105 z-10` 
+                  : 'bg-slate-800/40 border-slate-700 hover:border-slate-600'
+              }`}
+            >
               {plan.highlight && (
                 <div className={`absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-${plan.color}-500 text-black font-bold text-xs uppercase tracking-widest rounded-full shadow-lg`}>
                   {t('pricing.hit')}
                 </div>
               )}
+
               <div className="mb-6">
                 <div className={`flex items-center gap-2 text-${plan.color}-400 font-bold mb-2 uppercase tracking-wider text-sm`}>
                   {plan.icon} {plan.name}
@@ -217,23 +226,38 @@ export function PricingPage() {
                   <span className="text-4xl md:text-5xl font-black text-white">{plan.price}</span>
                   <span className="text-slate-500 font-medium">{plan.period}</span>
                 </div>
-                <p className="text-slate-400 text-sm mt-3 leading-relaxed">{plan.description}</p>
+                <p className="text-slate-400 text-sm mt-3 leading-relaxed">
+                  {plan.description}
+                </p>
               </div>
+
               <div className="flex-1 space-y-4 mb-8">
                 {plan.features.map((feature, i) => (
                   <div key={i} className="flex items-start gap-3">
-                    <div className={`p-1 rounded-full bg-${plan.color}-500/10 shrink-0 mt-0.5`}><Check className={`w-3 h-3 text-${plan.color}-400`} /></div>
+                    <div className={`p-1 rounded-full bg-${plan.color}-500/10 shrink-0 mt-0.5`}>
+                      <Check className={`w-3 h-3 text-${plan.color}-400`} />
+                    </div>
                     <span className="text-slate-200 text-sm">{feature}</span>
                   </div>
                 ))}
                 {plan.notIncluded.map((feature, i) => (
                   <div key={i} className="flex items-start gap-3 opacity-50">
-                    <div className="p-1 rounded-full bg-slate-700 shrink-0 mt-0.5"><X className="w-3 h-3 text-slate-400" /></div>
+                    <div className="p-1 rounded-full bg-slate-700 shrink-0 mt-0.5">
+                      <X className="w-3 h-3 text-slate-400" />
+                    </div>
                     <span className="text-slate-500 text-sm line-through">{feature}</span>
                   </div>
                 ))}
               </div>
+
               {plan.action}
+              
+              {plan.name === 'Teacher' && requestStatus === 'none' && (
+                <p className="text-[10px] text-center mt-3 text-slate-500">Требуется подтверждение документов</p>
+              )}
+              {plan.name === 'Teacher' && requestStatus === 'approved' && profile?.role !== 'teacher' && (
+                <p className="text-[10px] text-center mt-3 text-emerald-400 font-bold">Верификация пройдена! Оплатите для доступа.</p>
+              )}
             </div>
           ))}
         </div>
@@ -242,10 +266,12 @@ export function PricingPage() {
           <div className="flex flex-wrap justify-center gap-6 mb-4 font-medium text-slate-500">
             <a href="/terms-and-conditions" className="hover:text-cyan-400 transition-colors">{t('auth.terms')}</a>
             <a href="/terms-and-conditions" className="hover:text-cyan-400 transition-colors">{t('auth.privacy')}</a>
+            <a href="/terms-and-conditions" className="hover:text-cyan-400 transition-colors">Возврат средств</a>
           </div>
           <p className="mb-2">MathLab PvP © {new Date().getFullYear()}. {t('pricing.footer_rights')}</p>
           <p>Secure payments powered by <strong>Paddle</strong>.</p>
         </div>
+
       </div>
 
       {showVerificationModal && (
