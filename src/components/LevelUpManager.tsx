@@ -45,7 +45,7 @@ export function LevelUpManager() {
         if (oldPvPRank.fullName !== newPvPRank.fullName) {
           setModalData({
             type: 'pvp',
-            title: newPvPRank.fullName, // ✅ строка, не объект
+            title: newPvPRank.fullName, // строка, не объект
             icon: null
           });
           setShowModal(true);
