@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next'; // Хук
 import { supabase, Sector } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -84,6 +85,7 @@ type LabMapProps = {
 };
 
 export function LabMap({ onSectorSelect }: LabMapProps) {
+  const { t, i18n } = useTranslation();
   const { user, profile } = useAuth();
   const [sectors, setSectors] = useState<Sector[]>([]);
 
@@ -119,17 +121,17 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
           <div className="inline-block mb-4 animate-in fade-in slide-in-from-top-4 duration-700">
             <div className="px-6 py-2 bg-slate-900/60 backdrop-blur-md border border-cyan-500/30 rounded-full shadow-lg shadow-cyan-900/20">
               <span className="text-cyan-400 font-mono text-sm tracking-widest font-bold">
-                {!user ? 'РЕЖИМ: ДЕМО-ДОСТУП' : `УРОВЕНЬ ДОСТУПА: ${profile?.clearance_level ?? 0}`}
+                {!user ? t('map.demo_mode') : `${t('map.access_level')}: ${profile?.clearance_level ?? 0}`}
               </span>
             </div>
           </div>
           <h1 className="text-4xl md:text-6xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400 drop-shadow-sm">
-            СЕКТОРЫ ЗНАНИЙ
+            {t('map.title')}
           </h1>
           <p className="text-slate-300/80 text-lg max-w-2xl mx-auto font-light">
             {!user 
-              ? 'Вам доступны только базовые отсеки. Зарегистрируйтесь, чтобы открыть всю лабораторию.'
-              : 'Выберите модуль для начала исследований и повышения уровня.'
+              ? t('map.desc_guest')
+              : t('map.desc_user')
             }
           </p>
         </div>
@@ -140,6 +142,9 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
             const Icon = iconMap[sector.icon] || Zap;
             const unlocked = isUnlocked(sector);
             
+            const name = i18n.language === 'kk' && sector.name_kz ? sector.name_kz : sector.name;
+            const description = i18n.language === 'kk' && sector.description_kz ? sector.description_kz : sector.description;
+
             const style = themeStyles[sector.color] || {
               bg: 'hover:bg-slate-800',
               text: 'text-slate-400',
@@ -167,25 +172,20 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
                   <div className={`absolute -right-10 -top-10 w-32 h-32 bg-gradient-to-br ${style.text.replace('text-', 'from-')}/20 to-transparent blur-3xl group-hover:opacity-100 transition-opacity duration-500`} />
                 )}
 
-                {/* ВЕРХНЯЯ ЧАСТЬ: Иконка слева, Статус справа */}
+                {/* ВЕРХНЯЯ ЧАСТЬ */}
                 <div className="flex items-start justify-between mb-6 z-10 w-full">
-                  
-                  {/* Иконка сектора */}
                   <div className={`p-4 rounded-2xl ${unlocked ? style.iconBg : 'bg-slate-800 text-slate-600'} border border-white/5 shadow-inner transition-all duration-300 group-hover:scale-110`}>
                     <Icon className="w-8 h-8" />
                   </div>
                   
-                  {/* Правый верхний угол: Либо Номер сектора, либо Замок */}
                   <div className="text-right">
                     {!unlocked ? (
-                      // ЕСЛИ ЗАКРЫТО: Показываем замок в красивой рамке
                       <div className="bg-black/40 p-2 rounded-xl border border-slate-700/50 backdrop-blur-md shadow-lg">
                         <Lock className="w-5 h-5 text-slate-400" />
                       </div>
                     ) : (
-                      // ЕСЛИ ОТКРЫТО: Показываем номер
                       <span className="block font-mono text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1 px-2 py-1 rounded-lg bg-white/5 border border-white/5">
-                        Сектор {sector.id}
+                        {t('map.sector')} {sector.id}
                       </span>
                     )}
                   </div>
@@ -194,19 +194,19 @@ export function LabMap({ onSectorSelect }: LabMapProps) {
                 {/* Контент */}
                 <div className="z-10 h-full flex flex-col">
                   <h3 className={`text-2xl font-bold mb-3 leading-tight transition-colors ${unlocked ? 'text-white group-hover:text-white' : 'text-slate-500'}`}>
-                    {sector.name}
+                    {name}
                   </h3>
                   
                   <p className="text-slate-400 text-sm mb-6 line-clamp-2 leading-relaxed font-medium">
-                    {sector.description}
+                    {description}
                   </p>
 
                   {/* Футер карточки */}
                   <div className={`flex items-center justify-between border-t ${unlocked ? 'border-white/10' : 'border-white/5'} pt-4 mt-auto w-full`}>
                     <div className="text-xs font-mono font-bold flex items-center gap-2">
                       {!user 
-                        ? (unlocked ? <span className="text-emerald-400">● ОТКРЫТО</span> : <span className="text-slate-500">🔒 ЗАКРЫТО</span>) 
-                        : (unlocked ? <span className={`${style.text}`}>● ДОСТУПНО</span> : <span className="text-red-400/70">🔒 LVL {sector.required_clearance}</span>)
+                        ? (unlocked ? <span className="text-emerald-400">● {t('map.open')}</span> : <span className="text-slate-500">🔒 {t('map.closed')}</span>) 
+                        : (unlocked ? <span className={`${style.text}`}>● {t('map.available')}</span> : <span className="text-red-400/70">🔒 {t('map.locked')} {sector.required_clearance}</span>)
                       }
                     </div>
                     

@@ -1,79 +1,102 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { LevelUpModal } from './LevelUpModal';
+import { RankUpModal } from './RankUpModal';
+import { DerankModal } from './DerankModal';
+import { CalibrationRevealModal } from './CalibrationRevealModal';
 import { getRank, getPvPRank } from '../lib/gameLogic';
+
+type ModalState =
+  | { type: 'level'; title: string; icon: any }
+  | { type: 'rankup'; newRank: any; oldMMR: number; newMMR: number }
+  | { type: 'derank'; newRank: any; oldMMR: number; newMMR: number }
+  | { type: 'calibration'; finalMMR: number; finalRank: any };
 
 export function LevelUpManager() {
   const { profile } = useAuth();
-  
-  // Состояния для модалки
-  const [showModal, setShowModal] = useState(false);
-  const [modalData, setModalData] = useState<{ type: 'level' | 'pvp', title: string, icon: any } | null>(null);
 
-  // Храним предыдущие значения, чтобы сравнивать
-  // Используем useRef, чтобы не вызывать ререндер при обновлении цифр
+  const [modal, setModal] = useState<ModalState | null>(null);
+
   const prevLevelRef = useRef<number | null>(null);
   const prevMMRRef = useRef<number | null>(null);
+  const prevCalibratedRef = useRef<boolean | null>(null);
 
   useEffect(() => {
     if (!profile) return;
 
     const currentLevel = profile.clearance_level;
     const currentMMR = profile.mmr || 1000;
+    const hasCalibratedNow = profile.has_calibrated ?? false;
 
-    // === 1. ПРОВЕРКА УРОВНЯ (РАБОТА) ===
-    if (prevLevelRef.current !== null) {
-      // Если уровень вырос
-      if (currentLevel > prevLevelRef.current) {
-        const oldRank = getRank(prevLevelRef.current, profile.is_admin);
-        const newRank = getRank(currentLevel, profile.is_admin);
+    // === 1. CALIBRATION REVEAL (highest priority) ===
+    if (prevCalibratedRef.current === false && hasCalibratedNow) {
+      const rank = getPvPRank(currentMMR);
+      setModal({ type: 'calibration', finalMMR: currentMMR, finalRank: rank });
+      prevCalibratedRef.current = hasCalibratedNow;
+      prevMMRRef.current = currentMMR;
+      prevLevelRef.current = currentLevel;
+      return;
+    }
 
-        // Если сменилось ЗВАНИЕ (например, Лаборант -> Инженер)
-        if (oldRank.title !== newRank.title) {
-          setModalData({
-            type: 'level',
-            title: newRank.title,
-            icon: newRank.icon // Иконка из gameLogic
+    // === 2. LEVEL UP ===
+    if (prevLevelRef.current !== null && currentLevel > prevLevelRef.current) {
+      const oldRank = getRank(prevLevelRef.current, profile.role === 'admin');
+      const newRank = getRank(currentLevel, profile.role === 'admin');
+      if (oldRank.title !== newRank.title) {
+        setModal({ type: 'level', title: newRank.title, icon: newRank.icon });
+      }
+    }
+
+    // === 3. RANK UP / DERANK (only if calibrated) ===
+    if (hasCalibratedNow && prevMMRRef.current !== null) {
+      const oldPvPRank = getPvPRank(prevMMRRef.current);
+      const newPvPRank = getPvPRank(currentMMR);
+
+      if (oldPvPRank.name !== newPvPRank.name) {
+        if (currentMMR > prevMMRRef.current) {
+          // Rank up
+          setModal({
+            type: 'rankup',
+            newRank: newPvPRank,
+            oldMMR: prevMMRRef.current,
+            newMMR: currentMMR,
           });
-          setShowModal(true);
+        } else {
+          // Derank
+          setModal({
+            type: 'derank',
+            newRank: newPvPRank,
+            oldMMR: prevMMRRef.current,
+            newMMR: currentMMR,
+          });
         }
       }
     }
 
-    // === 2. ПРОВЕРКА РЕЙТИНГА (PVP) ===
-    if (prevMMRRef.current !== null) {
-      // Если рейтинг вырос
-      if (currentMMR > prevMMRRef.current) {
-        const oldPvPRank = getPvPRank(prevMMRRef.current);
-        const newPvPRank = getPvPRank(currentMMR);
-
-        // Если сменилась ЛИГА (например, Новичок -> Боец)
-        if (oldPvPRank !== newPvPRank) {
-           // Тут иконку можно подобрать или использовать кубок
-           setModalData({
-             type: 'pvp',
-             title: newPvPRank,
-             icon: null // В модалке будет дефолтная корона
-           });
-           setShowModal(true);
-        }
-      }
-    }
-
-    // Обновляем рефы
     prevLevelRef.current = currentLevel;
     prevMMRRef.current = currentMMR;
+    prevCalibratedRef.current = hasCalibratedNow;
+  }, [profile]);
 
-  }, [profile]); // Следим за изменением профиля (которое прилетает по Realtime или refreshProfile)
+  if (!modal) return null;
 
-  if (!showModal || !modalData) return null;
+  const close = () => setModal(null);
 
-  return (
-    <LevelUpModal 
-      type={modalData.type} 
-      newTitle={modalData.title} 
-      icon={modalData.icon}
-      onClose={() => setShowModal(false)} 
-    />
-  );
+  if (modal.type === 'level') {
+    return <LevelUpModal type="level" newTitle={modal.title} icon={modal.icon} onClose={close} />;
+  }
+
+  if (modal.type === 'rankup') {
+    return <RankUpModal newRank={modal.newRank} oldMMR={modal.oldMMR} newMMR={modal.newMMR} onClose={close} />;
+  }
+
+  if (modal.type === 'derank') {
+    return <DerankModal newRank={modal.newRank} oldMMR={modal.oldMMR} newMMR={modal.newMMR} onClose={close} />;
+  }
+
+  if (modal.type === 'calibration') {
+    return <CalibrationRevealModal finalMMR={modal.finalMMR} finalRank={modal.finalRank} onClose={close} />;
+  }
+
+  return null;
 }
