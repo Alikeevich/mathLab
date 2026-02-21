@@ -114,12 +114,32 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
 
   const handleBotWin = async (finalBotScore: number) => {
     if (status === 'finished') return;
-    if (duelId) await supabase.rpc('finish_duel', { duel_uuid: duelId, finisher_uuid: BOT_UUID });
     
-    // Determine winner immediately for bot match
-    if (myScore > finalBotScore) endGame('me', 25);
-    else if (myScore < finalBotScore) endGame('opponent', -20);
-    else endGame('opponent', -10); // Draw favors bot slightly in simpler logic, or handle draw
+    if (duelId) {
+       // 1. Принудительно ставим статус finished в таблице duels
+       // Это страховка, если RPC вдруг не сработает или сработает не так
+       await supabase.from('duels').update({ 
+           status: 'finished',
+           player2_score: finalBotScore,
+           player2_progress: problems.length // Бот точно закончил
+       }).eq('id', duelId);
+
+       // 2. Вызываем серверную функцию для пересчета рейтинга
+       // Важно: finisher_uuid = BOT_UUID, чтобы SQL понял, что закончил бот
+       await supabase.rpc('finish_duel', { 
+           duel_uuid: duelId, 
+           finisher_uuid: BOT_UUID 
+       });
+    }
+    
+    // 3. Локально завершаем игру
+    if (myScore > finalBotScore) {
+        endGame('me', 25);
+    } else if (myScore < finalBotScore) {
+        endGame('opponent', -25); // Минус 25 (как мы договорились)
+    } else {
+        endGame('opponent', -10);
+    }
   };
 
   // === Initial Load / Reconnect ===
