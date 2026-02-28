@@ -340,6 +340,9 @@ export function PricingPage() {
           }
         }} />
       )}
+      {showB2BModal && (
+        <B2BRequestModal onClose={() => setShowB2BModal(false)} />
+      )}
     </div>
   );
 }
