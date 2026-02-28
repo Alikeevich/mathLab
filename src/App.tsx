@@ -48,7 +48,7 @@ function MainApp() {
       onClose={() => setShowDashboard(false)} 
       onOpenLegal={(type) => setShowLegal(type)} // <--- Добавляем этот проп
     />
-  )}
+  )};
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
