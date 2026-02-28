@@ -43,7 +43,12 @@ function MainApp() {
   const [isGuest, setIsGuest] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
-  const [showDashboard, setShowDashboard] = useState(false);
+  {showDashboard && (
+    <Dashboard 
+      onClose={() => setShowDashboard(false)} 
+      onOpenLegal={(type) => setShowLegal(type)} // <--- Добавляем этот проп
+    />
+  )}
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
