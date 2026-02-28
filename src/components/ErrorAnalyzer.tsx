@@ -48,6 +48,15 @@ type ErrorAnalyzerProps = {
   onStartTraining: (problemIds: string[]) => void;
 };
 
+// === ФИКС ОТОБРАЖЕНИЯ ===
+// Убирает лишние $ и оборачивает в один слой $...$
+const renderMath = (text: string) => {
+  if (!text) return '';
+  // Убираем все существующие $ чтобы не было $$$
+  const clean = text.replace(/\$/g, '').trim();
+  return `$${clean}$`;
+};
+
 export function ErrorAnalyzer({ onBack, onStartTraining }: ErrorAnalyzerProps) {
   const { t, i18n } = useTranslation();
   const { user, profile } = useAuth();
@@ -237,21 +246,22 @@ export function ErrorAnalyzer({ onBack, onStartTraining }: ErrorAnalyzerProps) {
                     </button>
                   </div>
 
+                  {/* ИСПРАВЛЕННЫЙ РЕНДЕР ВОПРОСА */}
                   <div className="mb-4 text-base md:text-lg text-white font-medium leading-relaxed">
-                    <Latex>{`$${question}$`}</Latex>
+                    <Latex>{renderMath(question)}</Latex>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 bg-slate-900/50 rounded-lg p-3 border border-slate-700/50 mb-4">
                     <div>
                       <div className="text-[10px] text-red-400/70 uppercase mb-1 font-bold">{t('analyzer.your_answer')}</div>
                       <div className="text-red-400 font-mono text-sm break-all">
-                        <Latex>{`$${err.user_answer || "\\emptyset"}$`}</Latex>
+                        <Latex>{renderMath(err.user_answer || "\\emptyset")}</Latex>
                       </div>
                     </div>
                     <div>
                       <div className="text-[10px] text-emerald-400/70 uppercase mb-1 font-bold">{t('analyzer.correct_answer')}</div>
                       <div className="text-emerald-400 font-mono text-sm break-all">
-                        <Latex>{`$${err.correct_answer}$`}</Latex>
+                        <Latex>{renderMath(err.correct_answer)}</Latex>
                       </div>
                     </div>
                   </div>
