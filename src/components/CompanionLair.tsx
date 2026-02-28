@@ -182,11 +182,11 @@ export function CompanionLair({ onClose }: Props) {
               </div>
             </div>
 
-            {/* ШКАЛА XP */}
+{/* ШКАЛА SXP */}
             <div className="bg-slate-900 border border-slate-800 p-3 rounded-2xl">
               <div className="flex justify-between items-center mb-2">
                 <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase">
-                  <Zap className="w-3 h-3 text-cyan-400" /> Опыт
+                  <Zap className="w-3 h-3 text-cyan-400" /> SXP
                 </div>
                 <span className="text-cyan-400 font-mono">{profile?.companion_xp}/100</span>
               </div>
@@ -197,7 +197,6 @@ export function CompanionLair({ onClose }: Props) {
                 />
               </div>
             </div>
-          </div>
 
           {/* КНОПКИ ДЕЙСТВИЙ */}
           <div className="grid grid-cols-2 gap-3">
