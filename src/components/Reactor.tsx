@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { useTranslation } from 'react-i18next'; // Перевод
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Module } from '../lib/supabase';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -16,7 +16,9 @@ import {
   Loader,
   MessageSquare,
   AlertCircle,
-  Lock
+  Lock,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { CompanionChat } from './CompanionChat';
 import { MathInput } from './MathInput';
@@ -25,11 +27,11 @@ import { MathKeypad } from './MathKeypad';
 type Problem = {
   id: string;
   question: string;
-  question_kz?: string; // Добавил поле для типизации
+  question_kz?: string;
   answer: string;
   type: string;
   hint?: string;
-  hint_kz?: string; // Добавил поле
+  hint_kz?: string;
   image_url?: string;
 };
 
@@ -44,7 +46,6 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
   const { t, i18n } = useTranslation();
   const { user, profile, refreshProfile } = useAuth();
   
-  // ВОССТАНОВЛЕНЫ ВСЕ СТЕЙТЫ
   const [problems, setProblems] = useState<Problem[]>([]);
   const [currentProblem, setCurrentProblem] = useState<Problem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,7 +64,6 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
   const GUEST_LIMIT = 3;
   const [showPaywall, setShowPaywall] = useState(false);
 
-  // === 1. ЗАГРУЗКА ЗАДАЧ ===
   useEffect(() => {
     async function fetchProblems() {
       setLoading(true);
@@ -90,7 +90,6 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
     fetchProblems();
   }, [module.id, forcedProblemIds]);
 
-  // === 2. СМЕНА ЗАДАЧИ ===
   function loadNextProblem() {
     setXpGained(null);
     if (!user && problemsSolved >= GUEST_LIMIT) {
@@ -125,13 +124,24 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
     }
   }
 
+  // === УПРАВЛЕНИЕ КУРСОРОМ (Для стрелок) ===
+  const moveCursor = (direction: 'backward' | 'forward') => {
+    if (!mfRef.current) return;
+    const cmd = direction === 'backward' ? 'moveToPreviousChar' : 'moveToNextChar';
+    mfRef.current.executeCommand(cmd);
+    mfRef.current.focus({ preventScroll: true });
+  };
+
   const handleKeypadCommand = (cmd: string, arg?: string) => {
     if (!mfRef.current) return;
     const scrollY = window.scrollY;
-    const scrollX = window.scrollX;
     if (cmd === 'insert') mfRef.current.executeCommand(['insert', arg]);
     else if (cmd === 'perform') mfRef.current.executeCommand([arg]);
-    requestAnimationFrame(() => window.scrollTo(scrollX, scrollY));
+    
+    if (document.activeElement !== mfRef.current) {
+        mfRef.current.focus({ preventScroll: true });
+    }
+    requestAnimationFrame(() => window.scrollTo(0, scrollY));
   };
   
   const handleKeypadDelete = () => {
@@ -149,7 +159,6 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
     requestAnimationFrame(() => window.scrollTo(0, scrollY));
   };
 
-  // === 4. ОТПРАВКА ===
   async function handleSubmit(e?: React.FormEvent) {
     if (e) e.preventDefault();
     if (!currentProblem) return;
@@ -227,7 +236,6 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
     );
   }
 
-  // Локализация названия модуля и вопроса
   const modName = i18n.language === 'kk' && module.name_kz ? module.name_kz : module.name;
   const questionText = currentProblem 
     ? (i18n.language === 'kk' && currentProblem.question_kz ? currentProblem.question_kz : currentProblem.question)
@@ -262,30 +270,10 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
-          <div className="bg-slate-800/50 backdrop-blur-sm border border-cyan-500/30 rounded-xl p-3 md:p-4">
-            <div className="text-cyan-400/60 text-[10px] md:text-sm mb-1 uppercase">{t('reactor.experiments')}</div>
-            <div className="text-xl md:text-2xl font-bold text-white">{problemsSolved}</div>
-          </div>
-          <div className="bg-slate-800/50 backdrop-blur-sm border border-emerald-500/30 rounded-xl p-3 md:p-4">
-            <div className="text-emerald-400/60 text-[10px] md:text-sm mb-1 uppercase">{t('reactor.success')}</div>
-            <div className="text-xl md:text-2xl font-bold text-white">{correctCount}</div>
-          </div>
-          <div className="bg-slate-800/50 backdrop-blur-sm border border-purple-500/30 rounded-xl p-3 md:p-4">
-            <div className="text-purple-400/60 text-[10px] md:text-sm mb-1 uppercase">{t('reactor.efficiency')}</div>
-            <div className="text-xl md:text-2xl font-bold text-white">{successRate}%</div>
-          </div>
-        </div>
-
         {currentProblem ? (
           <div className="bg-slate-800/50 backdrop-blur-sm border border-cyan-500/30 rounded-2xl p-4 md:p-8 mb-6 relative overflow-hidden shadow-2xl">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
             
-            <div className="flex items-center gap-2 mb-6 relative z-10">
-              <Clock className="w-4 h-4 text-cyan-400" />
-              <span className="text-cyan-400 font-mono text-xs font-bold">{t('reactor.status_active')}</span>
-            </div>
-
+            {/* ... (Блок с вопросом такой же) ... */}
             <div className="mb-8 relative z-10">
               {currentProblem.image_url && (
                 <div className="mb-6 flex justify-center">
@@ -301,10 +289,6 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
             {result === null ? (
               <div className="relative z-10">
                 <div className="mb-4">
-                  <label className="block text-cyan-300 text-xs font-bold uppercase tracking-wider mb-2">
-                    {t('reactor.input_solution')}
-                  </label>
-                  
                   <MathInput 
                     value={userAnswer}
                     onChange={setUserAnswer}
@@ -320,18 +304,32 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
                   onSubmit={() => handleSubmit()}
                 />
 
-                <div className="flex justify-end gap-3 pt-4">
-                    {user && (
-                      <button type="button" onClick={() => setShowChat(true)} className="px-4 py-3 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-xl flex items-center justify-center gap-2 hover:bg-amber-500/20 transition-colors">
-                        <MessageSquare className="w-5 h-5" />
-                        <span className="hidden sm:inline text-sm font-bold">{t('reactor.suricat')}</span>
+                {/* НИЖНЯЯ ПАНЕЛЬ: Стрелки слева, Чаты справа */}
+                <div className="flex justify-between items-center pt-4">
+                    {/* СТРЕЛКИ */}
+                    <div className="flex gap-2">
+                      <button onClick={() => moveCursor('backward')} className="p-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl transition-colors active:scale-95 shadow-lg">
+                        <ChevronLeft className="w-6 h-6" />
                       </button>
-                    )}
-                    {!showHint && currentProblem.hint && (
-                      <button type="button" onClick={() => setShowHint(true)} className="px-5 py-3 bg-slate-700 hover:bg-slate-600 text-cyan-400 font-bold rounded-xl transition-colors">
-                        ?
+                      <button onClick={() => moveCursor('forward')} className="p-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl transition-colors active:scale-95 shadow-lg">
+                        <ChevronRight className="w-6 h-6" />
                       </button>
-                    )}
+                    </div>
+
+                    {/* СУРИКАТ И ПОДСКАЗКА */}
+                    <div className="flex gap-3">
+                        {user && (
+                          <button type="button" onClick={() => setShowChat(true)} className="px-4 py-3 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-xl flex items-center justify-center gap-2 hover:bg-amber-500/20 transition-colors active:scale-95">
+                            <MessageSquare className="w-5 h-5" />
+                            <span className="hidden sm:inline text-sm font-bold">{t('reactor.suricat')}</span>
+                          </button>
+                        )}
+                        {!showHint && currentProblem.hint && (
+                          <button type="button" onClick={() => setShowHint(true)} className="px-5 py-3 bg-slate-700 hover:bg-slate-600 text-cyan-400 font-bold rounded-xl transition-colors active:scale-95 shadow-lg">
+                            ?
+                          </button>
+                        )}
+                    </div>
                 </div>
                 
                 {showHint && hintText && (
@@ -342,7 +340,7 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
                 )}
               </div>
             ) : (
-              // ЗОНА РЕЗУЛЬТАТА
+              // ЗОНА РЕЗУЛЬТАТА (без изменений)
               <div className={`p-6 rounded-2xl border-2 flex items-center gap-4 animate-in zoom-in duration-300 ${result === 'correct' ? 'bg-emerald-500/10 border-emerald-500/50' : 'bg-red-500/10 border-red-500/50'}`}>
                 <div className={`p-3 rounded-full shrink-0 ${result === 'correct' ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
                   {result === 'correct' ? (
@@ -355,13 +353,11 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
                   <div className={`text-xl font-bold ${result === 'correct' ? 'text-emerald-400' : 'text-red-400'}`}>
                     {result === 'correct' ? t('reactor.correct') : t('reactor.incorrect')}
                   </div>
-                  {/* ПОКАЗ XP */}
                   {result === 'correct' && xpGained && (
                      <div className="text-amber-400 font-bold text-sm mt-1 animate-pulse">
                         +{xpGained} XP {profile?.is_premium ? '(x2 Premium)' : ''}
                      </div>
                   )}
-                  
                   {result === 'incorrect' && (
                     <div className="text-slate-300 text-sm mt-1">
                       {t('reactor.correct_answer')} <span className="font-mono font-bold text-white bg-slate-700 px-2 py-0.5 rounded"><Latex>{`$${currentProblem.answer}$`}</Latex></span>
