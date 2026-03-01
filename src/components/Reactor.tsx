@@ -353,9 +353,21 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
                   <div className={`text-xl font-bold ${result === 'correct' ? 'text-emerald-400' : 'text-red-400'}`}>
                     {result === 'correct' ? t('reactor.correct') : t('reactor.incorrect')}
                   </div>
-                  {result === 'correct' && xpGained && (
-                     <div className="text-amber-400 font-bold text-sm mt-1 animate-pulse">
-                        +{xpGained} XP {profile?.is_premium ? '(x2 Premium)' : ''}
+                  
+                  {/* === НОВАЯ СИСТЕМА НАГРАД === */}
+                  {result === 'correct' && (
+                     <div className="flex flex-col gap-1 mt-2 animate-in slide-in-from-bottom-2 fade-in duration-500">
+                        {/* Награда Игрока (XP) */}
+                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/10 border border-blue-500/30 rounded-lg text-blue-400 text-xs font-bold font-mono">
+                           <Zap className="w-3 h-3 fill-current" /> +10 XP
+                        </div>
+                        
+                        {/* Награда Суриката (SXP) */}
+                        {xpGained && (
+                          <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-400 text-xs font-bold font-mono">
+                             <span className="text-lg leading-none">🐾</span> +{xpGained} SXP {profile?.is_premium ? '(x2)' : ''}
+                          </div>
+                        )}
                      </div>
                   )}
                   {result === 'incorrect' && (
