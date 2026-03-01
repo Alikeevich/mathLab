@@ -193,7 +193,6 @@ export function normalizeForCalculation(str: string): string {
   );
 
   // === 9. СМЕШАННЫЕ ЧИСЛА LaTeX: 15\frac{73}{144} ===
-  // ФИКС ИИ: (\d) → (\d+) — теперь работает с многозначными целыми (133 2/3)
   s = s.replace(/(\d+)\s*\\?frac\{([^}]+)\}\{([^}]+)\}/g, '($1+($2)/($3))');
   // Обычный вид: 15 73/144 (с пробелом)
   s = s.replace(/(\d+)\s+(\d+)\/(\d+)/g, '($1+$2/$3)');
@@ -489,11 +488,58 @@ export function checkAnswer(userAnswer: string, dbAnswer: string): boolean {
     });
 
   } catch {
-    // === FALLBACK: текстовое сравнение ===
+    // === FALLBACK: сначала пробуем числовое, потом текстовое ===
+
+    // Попытка числового сравнения во fallback
+    const tryCalc = (expr: string): number => {
+      try {
+        const norm = normalizeForCalculation(expr);
+        if (norm === 'NaN' || norm === '') return NaN;
+        const trimmed = norm.trim();
+        if (PERIODIC_FRACTIONS[trimmed] !== undefined) return PERIODIC_FRACTIONS[trimmed];
+        const res = evaluate(norm, ALGEBRA_SCOPE);
+        if (typeof res === 'number') return res;
+        if (typeof res === 'boolean') return res ? 1 : 0;
+        if (typeof res === 'object' && res !== null && 're' in res) return (res as any).re;
+        return NaN;
+      } catch {
+        return NaN;
+      }
+    };
+
+    const uFallbackVals = expandOptions(userTrim).map(tryCalc);
+    const dFallbackVals = expandOptions(dbTrim).map(tryCalc);
+
+    if (
+      uFallbackVals.length === dFallbackVals.length &&
+      uFallbackVals.every(v => !isNaN(v)) &&
+      dFallbackVals.every(v => !isNaN(v))
+    ) {
+      uFallbackVals.sort((a, b) => a - b);
+      dFallbackVals.sort((a, b) => a - b);
+      const match = uFallbackVals.every((uVal, i) => {
+        const dVal = dFallbackVals[i];
+        if (!isFinite(uVal) || !isFinite(dVal)) return uVal === dVal;
+        const isInt = (v: number) => Math.abs(v - Math.round(v)) < 1e-9;
+        if (isInt(uVal) && isInt(dVal)) return Math.round(uVal) === Math.round(dVal);
+        const tolerance = Math.max(0.001, Math.abs(dVal * 0.001));
+        return Math.abs(uVal - dVal) <= tolerance;
+      });
+      if (match) return true;
+    }
+
+    // Текстовое сравнение — нормализуем дроби к единому виду a/b
+    const normFractionStr = (s: string): string => {
+      // ((1)/(2)) → 1/2
+      return s.replace(/\(\(([^()]+)\)\/\(([^()]+)\)\)/g, '$1/$2')
+              .replace(/\(([^()]+)\/([^()]+)\)/g, '$1/$2');
+    };
+
     const clean = (s: string) => {
       if (isInequalityOrInterval(s)) return normalizeInequality(s);
       try {
-        return normalizeForCalculation(s).replace(/\s/g, '');
+        const norm = normalizeForCalculation(s).replace(/\s/g, '');
+        return normFractionStr(norm);
       } catch {
         return s.toLowerCase().replace(/\s/g, '');
       }
