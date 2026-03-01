@@ -40,11 +40,14 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
   const [xpGained, setXpGained] = useState<number | null>(null);
 
-  // Ref для хранения winner_id при финише без Realtime
-  const winnerIdRef = useRef<string | null>(null);
+  // Флаг чтобы не вызывать finishMatch дважды
+  const isFinishingRef = useRef(false);
 
   // Таймер отключения соперника
   const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // isP1 запоминаем при инициализации
+  const isP1Ref = useRef(false);
 
   const handleKeypadCommand = (cmd: string, arg?: string) => {
     if (!mfRef.current) return;
@@ -75,6 +78,27 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     requestAnimationFrame(() => window.scrollTo(0, scrollY));
   };
 
+  // Финализируем матч: читаем актуальные данные из БД и показываем экран результата
+  const finishMatch = useCallback(async () => {
+    if (isFinishingRef.current) return;
+    isFinishingRef.current = true;
+
+    const { data: finalDuel } = await supabase
+      .from('duels')
+      .select('winner_id, player1_score, player2_score, player1_id')
+      .eq('id', duelId)
+      .single();
+
+    if (finalDuel) {
+      const isP1 = finalDuel.player1_id === user?.id;
+      setMyScore(isP1 ? finalDuel.player1_score : finalDuel.player2_score);
+      setOppScore(isP1 ? finalDuel.player2_score : finalDuel.player1_score);
+      setWinnerId(finalDuel.winner_id);
+    }
+
+    setMatchStatus('finished');
+  }, [duelId, user]);
+
   useEffect(() => {
     let channel: RealtimeChannel | null = null;
 
@@ -92,15 +116,16 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
       }).then(() => {});
 
       if (duel.status === 'finished') {
-        setMatchStatus('finished');
         setWinnerId(duel.winner_id);
         setMyScore(duel.player1_id === user.id ? duel.player1_score : duel.player2_score);
         setOppScore(duel.player1_id === user.id ? duel.player2_score : duel.player1_score);
+        setMatchStatus('finished');
         setLoading(false);
         return;
       }
 
       const isP1 = duel.player1_id === user.id;
+      isP1Ref.current = isP1;
       const oppId = isP1 ? duel.player2_id : duel.player1_id;
 
       await loadProblems(duel.problem_ids);
@@ -125,10 +150,16 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
           { event: 'UPDATE', schema: 'public', table: 'duels', filter: `id=eq.${duel.id}` },
           (payload) => {
             const d = payload.new;
-            setOppScore(isP1 ? d.player2_score : d.player1_score);
-            setOppProgress(isP1 ? d.player2_progress : d.player1_progress);
+            const p1 = isP1Ref.current;
+            setOppScore(p1 ? d.player2_score : d.player1_score);
+            setOppProgress(p1 ? d.player2_progress : d.player1_progress);
+
+            // Противник завершил раньше нас — заканчиваем матч немедленно
             if (d.status === 'finished') {
               setWinnerId(d.winner_id);
+              setMyScore(p1 ? d.player1_score : d.player2_score);
+              setOppScore(p1 ? d.player2_score : d.player1_score);
+              isFinishingRef.current = true; // предотвращаем двойной вызов
               setMatchStatus('finished');
             }
           }
@@ -186,29 +217,17 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
       });
 
       if (isLastProblem) {
-        const { data: finishData } = await supabase.rpc('finish_duel', {
+        // Первый завершивший вызывает finish_duel
+        // Второй игрок получит Realtime UPDATE и тоже завершит матч
+        await supabase.rpc('finish_duel', {
           duel_uuid: duelId,
           finisher_uuid: user.id,
         });
 
-        // FIX: не ждём Realtime — сразу читаем финальный стейт из базы
-        const { data: finalDuel } = await supabase
-          .from('duels')
-          .select('winner_id, player1_score, player2_score, player1_id')
-          .eq('id', duelId)
-          .single();
-
-        if (finalDuel) {
-          const isP1 = finalDuel.player1_id === user.id;
-          setMyScore(isP1 ? finalDuel.player1_score : finalDuel.player2_score);
-          setOppScore(isP1 ? finalDuel.player2_score : finalDuel.player1_score);
-          setWinnerId(finalDuel.winner_id);
-        }
-
         setTimeout(() => {
           setFeedback(null);
           setCurrentProbIndex(newProgress);
-          setMatchStatus('finished'); // <-- принудительно завершаем, не ждём Realtime
+          finishMatch(); // читаем финальный стейт и показываем экран
         }, 1000);
         return;
       }
@@ -227,7 +246,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
         }, 50);
       }
     }, 1000);
-  }, [duelId, user, myScore, currentProbIndex, problems.length]);
+  }, [duelId, user, myScore, currentProbIndex, problems.length, finishMatch]);
 
   const handleTimeout = useCallback(() => {
     if (feedback) return;
@@ -334,8 +353,6 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
   }
 
   const currentProb = problems[currentProbIndex];
-
-  // FIX: убираем обёртку $...$ — вопросы в базе уже содержат $ или текст без них
   const questionText = i18n.language === 'kk' && currentProb?.question_kz
     ? currentProb.question_kz
     : currentProb?.question;
@@ -401,7 +418,6 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
           <div className="w-full max-w-lg">
             <div className="bg-slate-800/50 backdrop-blur-sm border border-cyan-500/20 rounded-2xl p-6 shadow-xl text-center min-h-[150px] flex flex-col items-center justify-center">
               <div className="text-2xl md:text-3xl font-bold text-white leading-relaxed tracking-wide">
-                {/* FIX: убрана обёртка $...$ — было $${questionText}$ */}
                 <Latex>{questionText}</Latex>
               </div>
               <div className="mt-4 text-xs text-slate-500 font-mono uppercase tracking-widest">
