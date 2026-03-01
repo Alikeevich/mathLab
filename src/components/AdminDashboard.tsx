@@ -54,6 +54,9 @@ export function AdminDashboard({ onClose }: Props) {
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
+    if (activeTab === 'users') fetchUsers();
+    if (activeTab === 'requests') fetchRequests();
+    if (activeTab === 'b2b') fetchB2B();
     let channel: any;
 
     if (activeTab === 'analytics') {
