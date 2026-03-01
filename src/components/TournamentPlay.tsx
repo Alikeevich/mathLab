@@ -17,7 +17,7 @@ type Props = {
 
 export function TournamentPlay({ duelId, onFinished }: Props) {
   const { t, i18n } = useTranslation();
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [opponentName, setOpponentName] = useState<string>('Соперник');
@@ -40,26 +40,18 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
   const [xpGained, setXpGained] = useState<number | null>(null);
 
-  // Флаг чтобы не вызывать finishMatch дважды
-  const isFinishingRef = useRef(false);
-
-  // Таймер отключения соперника
+  const isP1Ref = useRef(false);
   const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // isP1 запоминаем при инициализации
-  const isP1Ref = useRef(false);
+  // Защита от двойного применения финального стейта
+  const finishedRef = useRef(false);
 
   const handleKeypadCommand = (cmd: string, arg?: string) => {
     if (!mfRef.current) return;
     const scrollY = window.scrollY;
-    if (cmd === 'insert') {
-      mfRef.current.executeCommand(['insert', arg]);
-    } else if (cmd === 'perform') {
-      mfRef.current.executeCommand([arg]);
-    }
-    if (document.activeElement !== mfRef.current) {
-      mfRef.current.focus({ preventScroll: true });
-    }
+    if (cmd === 'insert') mfRef.current.executeCommand(['insert', arg]);
+    else if (cmd === 'perform') mfRef.current.executeCommand([arg]);
+    if (document.activeElement !== mfRef.current) mfRef.current.focus({ preventScroll: true });
     requestAnimationFrame(() => window.scrollTo(0, scrollY));
   };
 
@@ -78,26 +70,16 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     requestAnimationFrame(() => window.scrollTo(0, scrollY));
   };
 
-  // Финализируем матч: читаем актуальные данные из БД и показываем экран результата
-  const finishMatch = useCallback(async () => {
-    if (isFinishingRef.current) return;
-    isFinishingRef.current = true;
-
-    const { data: finalDuel } = await supabase
-      .from('duels')
-      .select('winner_id, player1_score, player2_score, player1_id')
-      .eq('id', duelId)
-      .single();
-
-    if (finalDuel) {
-      const isP1 = finalDuel.player1_id === user?.id;
-      setMyScore(isP1 ? finalDuel.player1_score : finalDuel.player2_score);
-      setOppScore(isP1 ? finalDuel.player2_score : finalDuel.player1_score);
-      setWinnerId(finalDuel.winner_id);
-    }
-
+  const applyFinish = useCallback((winnerId: string, p1Score: number, p2Score: number) => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    const isP1 = isP1Ref.current;
+    setWinnerId(winnerId);
+    setMyScore(isP1 ? p1Score : p2Score);
+    setOppScore(isP1 ? p2Score : p1Score);
+    setFeedback(null);
     setMatchStatus('finished');
-  }, [duelId, user]);
+  }, []);
 
   useEffect(() => {
     let channel: RealtimeChannel | null = null;
@@ -105,7 +87,12 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     async function initMatch() {
       if (!user) return;
 
-      const { data: duel } = await supabase.from('duels').select('*').eq('id', duelId).single();
+      const { data: duel } = await supabase
+        .from('duels')
+        .select('*')
+        .eq('id', duelId)
+        .single();
+
       if (!duel) { onFinished(); return; }
 
       supabase.from('tournament_logs').insert({
@@ -115,11 +102,9 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
         details: { duel_id: duelId, round: duel.round }
       }).then(() => {});
 
+      // Дуэль уже завершена (например reconnect)
       if (duel.status === 'finished') {
-        setWinnerId(duel.winner_id);
-        setMyScore(duel.player1_id === user.id ? duel.player1_score : duel.player2_score);
-        setOppScore(duel.player1_id === user.id ? duel.player2_score : duel.player1_score);
-        setMatchStatus('finished');
+        applyFinish(duel.winner_id, duel.player1_score, duel.player2_score);
         setLoading(false);
         return;
       }
@@ -131,7 +116,11 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
       await loadProblems(duel.problem_ids);
 
       if (oppId) {
-        const { data: oppProfile } = await supabase.from('profiles').select('username').eq('id', oppId).single();
+        const { data: oppProfile } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', oppId)
+          .single();
         if (oppProfile) setOpponentName(oppProfile.username);
       } else {
         setOpponentName(t('tournaments.waiting_player'));
@@ -151,16 +140,14 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
           (payload) => {
             const d = payload.new;
             const p1 = isP1Ref.current;
+
+            // Всегда обновляем прогресс соперника
             setOppScore(p1 ? d.player2_score : d.player1_score);
             setOppProgress(p1 ? d.player2_progress : d.player1_progress);
 
-            // Противник завершил раньше нас — заканчиваем матч немедленно
-            if (d.status === 'finished') {
-              setWinnerId(d.winner_id);
-              setMyScore(p1 ? d.player1_score : d.player2_score);
-              setOppScore(p1 ? d.player2_score : d.player1_score);
-              isFinishingRef.current = true; // предотвращаем двойной вызов
-              setMatchStatus('finished');
+            // Дуэль завершена — применяем финал для ОБОИХ игроков
+            if (d.status === 'finished' && d.winner_id) {
+              applyFinish(d.winner_id, d.player1_score, d.player2_score);
             }
           }
         )
@@ -197,45 +184,33 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
       if (disconnectTimerRef.current) clearTimeout(disconnectTimerRef.current);
       if (channel) supabase.removeChannel(channel);
     };
-  }, [duelId, user, onFinished]);
+  }, [duelId, user, onFinished, applyFinish]);
 
   const submitResult = useCallback(async (isCorrect: boolean) => {
-    if (!user || !duelId) return;
-    setFeedback(isCorrect ? 'correct' : 'wrong');
+    if (!user || !duelId || matchStatus === 'finished') return;
 
+    setFeedback(isCorrect ? 'correct' : 'wrong');
     const newScore = isCorrect ? myScore + 1 : myScore;
     setMyScore(newScore);
     const newProgress = currentProbIndex + 1;
-    const isLastProblem = newProgress >= problems.length;
 
     try {
+      // submit_pvp_move теперь сам завершает дуэль если нужно
+      // и триггерит Realtime UPDATE -> applyFinish сработает для обоих
       await supabase.rpc('submit_pvp_move', {
         duel_uuid: duelId,
         player_uuid: user.id,
         is_correct: isCorrect,
         problem_idx: currentProbIndex,
       });
-
-      if (isLastProblem) {
-        // Первый завершивший вызывает finish_duel
-        // Второй игрок получит Realtime UPDATE и тоже завершит матч
-        await supabase.rpc('finish_duel', {
-          duel_uuid: duelId,
-          finisher_uuid: user.id,
-        });
-
-        setTimeout(() => {
-          setFeedback(null);
-          setCurrentProbIndex(newProgress);
-          finishMatch(); // читаем финальный стейт и показываем экран
-        }, 1000);
-        return;
-      }
     } catch (err) {
       console.error('Ошибка при отправке ответа:', err);
     }
 
     setTimeout(() => {
+      // Если дуэль уже завершилась через Realtime — не трогаем UI
+      if (finishedRef.current) return;
+
       setFeedback(null);
       setCurrentProbIndex(newProgress);
       setUserAnswer('');
@@ -246,12 +221,12 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
         }, 50);
       }
     }, 1000);
-  }, [duelId, user, myScore, currentProbIndex, problems.length, finishMatch]);
+  }, [duelId, user, myScore, currentProbIndex, matchStatus]);
 
   const handleTimeout = useCallback(() => {
-    if (feedback) return;
+    if (feedback || matchStatus === 'finished') return;
     submitResult(false);
-  }, [feedback, submitResult]);
+  }, [feedback, matchStatus, submitResult]);
 
   useEffect(() => {
     let timer: any;
@@ -278,7 +253,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
 
   const handleAnswer = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (feedback || !userAnswer || userAnswer.trim() === '') return;
+    if (feedback || matchStatus === 'finished' || !userAnswer || userAnswer.trim() === '') return;
     const currentProb = problems[currentProbIndex];
     const isCorrect = checkAnswer(userAnswer, currentProb.answer);
     submitResult(isCorrect);
@@ -298,7 +273,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     setProblems(sorted);
   }
 
-  // Выдача XP победителю
+  // XP победителю
   useEffect(() => {
     if (matchStatus === 'finished' && winnerId === user?.id && !xpGained) {
       grantXp(user.id, profile?.is_premium || false, 50).then(res => {
@@ -344,7 +319,10 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
           <div className="text-4xl font-mono font-bold text-white mb-8">
             {myScore} : {oppScore}
           </div>
-          <button onClick={onFinished} className="w-full px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition-colors">
+          <button
+            onClick={onFinished}
+            className="w-full px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition-colors"
+          >
             {t('tournaments.bracket_title')}
           </button>
         </div>
@@ -369,8 +347,18 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
               <p className="text-slate-400 text-sm">{t('pvp.surrender_text')}</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => setShowSurrenderModal(false)} className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold">{t('pvp.cancel')}</button>
-              <button onClick={confirmSurrender} className="px-4 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold">{t('pvp.btn_surrender')}</button>
+              <button
+                onClick={() => setShowSurrenderModal(false)}
+                className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold"
+              >
+                {t('pvp.cancel')}
+              </button>
+              <button
+                onClick={confirmSurrender}
+                className="px-4 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold"
+              >
+                {t('pvp.btn_surrender')}
+              </button>
             </div>
           </div>
         </div>
@@ -385,7 +373,10 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
 
       <div className="flex-shrink-0 bg-slate-900 border-b border-slate-800 shadow-lg z-10">
         <div className="flex items-center justify-between px-3 py-2 bg-slate-800/80 border-b border-slate-700">
-          <button onClick={() => setShowSurrenderModal(true)} className="p-1.5 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-lg">
+          <button
+            onClick={() => setShowSurrenderModal(true)}
+            className="p-1.5 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-lg"
+          >
             <Flag className="w-4 h-4" />
           </button>
           <div className="text-right">
@@ -405,10 +396,16 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
 
         <div className="space-y-1 px-3 py-2 bg-slate-900">
           <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-            <div className="h-full bg-cyan-500 transition-all duration-300" style={{ width: `${(currentProbIndex / (problems.length || 10)) * 100}%` }} />
+            <div
+              className="h-full bg-cyan-500 transition-all duration-300"
+              style={{ width: `${(currentProbIndex / (problems.length || 10)) * 100}%` }}
+            />
           </div>
           <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-            <div className="h-full bg-red-500 transition-all duration-300" style={{ width: `${(oppProgress / (problems.length || 10)) * 100}%` }} />
+            <div
+              className="h-full bg-red-500 transition-all duration-300"
+              style={{ width: `${(oppProgress / (problems.length || 10)) * 100}%` }}
+            />
           </div>
         </div>
       </div>
@@ -461,7 +458,6 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
           </div>
         )}
       </div>
-
     </div>
   );
 }
