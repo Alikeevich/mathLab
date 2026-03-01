@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useTranslation } from 'react-i18next'; // Перевод
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Latex from 'react-latex-next';
@@ -18,51 +18,52 @@ type Props = {
 export function TournamentPlay({ duelId, onFinished }: Props) {
   const { t, i18n } = useTranslation();
   const { user, profile, refreshProfile } = useAuth();
- 
+
   const [loading, setLoading] = useState(true);
   const [opponentName, setOpponentName] = useState<string>('Соперник');
- 
+
   const [problems, setProblems] = useState<any[]>([]);
   const [currentProbIndex, setCurrentProbIndex] = useState(0);
   const [myScore, setMyScore] = useState(0);
   const [oppScore, setOppScore] = useState(0);
   const [oppProgress, setOppProgress] = useState(0);
-  
+
   const [userAnswer, setUserAnswer] = useState('');
   const mfRef = useRef<any>(null);
- 
+
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [timeLeft, setTimeLeft] = useState(60);
   const [matchStatus, setMatchStatus] = useState<'active' | 'finished'>('active');
   const [winnerId, setWinnerId] = useState<string | null>(null);
- 
+
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
   const [xpGained, setXpGained] = useState<number | null>(null);
 
+  // Таймер отключения соперника
+  const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleKeypadCommand = (cmd: string, arg?: string) => {
     if (!mfRef.current) return;
     const scrollY = window.scrollY;
-   
     if (cmd === 'insert') {
       mfRef.current.executeCommand(['insert', arg]);
     } else if (cmd === 'perform') {
       mfRef.current.executeCommand([arg]);
     }
-    
     if (document.activeElement !== mfRef.current) {
-        mfRef.current.focus({ preventScroll: true });
+      mfRef.current.focus({ preventScroll: true });
     }
     requestAnimationFrame(() => window.scrollTo(0, scrollY));
   };
- 
+
   const handleKeypadDelete = () => {
     if (!mfRef.current) return;
     const scrollY = window.scrollY;
     mfRef.current.executeCommand(['deleteBackward']);
     requestAnimationFrame(() => window.scrollTo(0, scrollY));
   };
- 
+
   const handleKeypadClear = () => {
     if (!mfRef.current) return;
     const scrollY = window.scrollY;
@@ -73,12 +74,13 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
 
   useEffect(() => {
     let channel: RealtimeChannel | null = null;
+
     async function initMatch() {
       if (!user) return;
-     
+
       const { data: duel } = await supabase.from('duels').select('*').eq('id', duelId).single();
       if (!duel) { onFinished(); return; }
-      
+
       supabase.from('tournament_logs').insert({
         tournament_id: duel.tournament_id,
         user_id: user.id,
@@ -97,9 +99,9 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
 
       const isP1 = duel.player1_id === user.id;
       const oppId = isP1 ? duel.player2_id : duel.player1_id;
-     
+
       await loadProblems(duel.problem_ids);
-     
+
       if (oppId) {
         const { data: oppProfile } = await supabase.from('profiles').select('username').eq('id', oppId).single();
         if (oppProfile) setOpponentName(oppProfile.username);
@@ -107,67 +109,68 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
         setOpponentName(t('tournaments.waiting_player'));
       }
 
-      const myProg = isP1 ? duel.player1_progress : duel.player2_progress;
-      const myPts = isP1 ? duel.player1_score : duel.player2_score;
-      const oppPts = isP1 ? duel.player2_score : duel.player1_score;
-      const oppProg = isP1 ? duel.player2_progress : duel.player1_progress;
-     
-      setCurrentProbIndex(myProg);
-      setMyScore(myPts);
-      setOppScore(oppPts);
-      setOppProgress(oppProg);
+      setCurrentProbIndex(isP1 ? duel.player1_progress : duel.player2_progress);
+      setMyScore(isP1 ? duel.player1_score : duel.player2_score);
+      setOppScore(isP1 ? duel.player2_score : duel.player1_score);
+      setOppProgress(isP1 ? duel.player2_progress : duel.player1_progress);
       setLoading(false);
-     
+
+      // Один канал — и postgres_changes, и Presence
       channel = supabase
         .channel(`t-duel-${duel.id}`)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'duels', filter: `id=eq.${duel.id}` },
-        (payload) => {
-          const newData = payload.new;
-          const newOppScore = isP1 ? newData.player2_score : newData.player1_score;
-          const newOppProg = isP1 ? newData.player2_progress : newData.player1_progress;
-          setOppScore(newOppScore);
-          setOppProgress(newOppProg);
-          if (newData.status === 'finished') {
-            setMatchStatus('finished');
-            setWinnerId(newData.winner_id);
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'duels', filter: `id=eq.${duel.id}` },
+          (payload) => {
+            const d = payload.new;
+            setOppScore(isP1 ? d.player2_score : d.player1_score);
+            setOppProgress(isP1 ? d.player2_progress : d.player1_progress);
+            if (d.status === 'finished') {
+              setMatchStatus('finished');
+              setWinnerId(d.winner_id);
+            }
+          }
+        )
+        .on('presence', { event: 'leave' }, ({ leftPresences }) => {
+          const oppLeft = (leftPresences as any[]).find(p => p.user_id !== user.id);
+          if (oppLeft) {
+            // Даём 2 минуты на переподключение
+            disconnectTimerRef.current = setTimeout(async () => {
+              setOpponentDisconnected(true);
+              await supabase.rpc('claim_timeout_win', {
+                duel_uuid: duelId,
+                claimant_uuid: user.id,
+              });
+            }, 120_000);
           }
         })
-        .subscribe();
+        .on('presence', { event: 'join' }, ({ newPresences }) => {
+          const oppBack = (newPresences as any[]).find(p => p.user_id !== user.id);
+          if (oppBack && disconnectTimerRef.current) {
+            clearTimeout(disconnectTimerRef.current);
+            disconnectTimerRef.current = null;
+            setOpponentDisconnected(false);
+          }
+        })
+        .subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            await channel!.track({ user_id: user.id });
+          }
+        });
     }
+
     initMatch();
+
     return () => {
+      if (disconnectTimerRef.current) clearTimeout(disconnectTimerRef.current);
       if (channel) supabase.removeChannel(channel);
     };
   }, [duelId, user, onFinished]);
 
-  useEffect(() => {
-    let interval: any;
-    if (matchStatus === 'active' && duelId && !loading && user) {
-      interval = setInterval(async () => {
-        const { data: duelInfo } = await supabase.from('duels').select('player1_id').eq('id', duelId).single();
-        if (!duelInfo) return;
-        const isP1 = duelInfo.player1_id === user.id;
-        const updateField = isP1 ? 'player1_last_seen' : 'player2_last_seen';
-       
-        await supabase.from('duels').update({ [updateField]: new Date().toISOString() }).eq('id', duelId);
-        
-        const { data } = await supabase.from('duels').select('player1_last_seen, player2_last_seen').eq('id', duelId).single();
-        if (data) {
-          const oppLastSeen = isP1 ? data.player2_last_seen : data.player1_last_seen;
-          if (oppLastSeen && (Date.now() - new Date(oppLastSeen).getTime() > 120000)) {
-            setOpponentDisconnected(true);
-            await supabase.rpc('claim_timeout_win', { duel_uuid: duelId, claimant_uuid: user.id });
-          }
-        }
-      }, 5000);
-    }
-    return () => clearInterval(interval);
-  }, [matchStatus, duelId, loading, user]);
-
   const submitResult = useCallback(async (isCorrect: boolean) => {
     if (!user || !duelId) return;
     setFeedback(isCorrect ? 'correct' : 'wrong');
-   
+
     const newScore = isCorrect ? myScore + 1 : myScore;
     setMyScore(newScore);
     const newProgress = currentProbIndex + 1;
@@ -177,13 +180,13 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
         duel_uuid: duelId,
         player_uuid: user.id,
         is_correct: isCorrect,
-        problem_idx: currentProbIndex
+        problem_idx: currentProbIndex,
       });
       if (newProgress >= problems.length) {
-          await supabase.rpc('finish_duel', { duel_uuid: duelId, finisher_uuid: user.id });
+        await supabase.rpc('finish_duel', { duel_uuid: duelId, finisher_uuid: user.id });
       }
     } catch (err) {
-      console.error("Ошибка при отправке ответа:", err);
+      console.error('Ошибка при отправке ответа:', err);
     }
 
     setTimeout(() => {
@@ -193,7 +196,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
       if (mfRef.current) {
         mfRef.current.setValue('');
         setTimeout(() => {
-            if (mfRef.current) mfRef.current.focus({ preventScroll: true });
+          if (mfRef.current) mfRef.current.focus({ preventScroll: true });
         }, 50);
       }
     }, 1000);
@@ -209,10 +212,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     if (matchStatus === 'active' && !feedback && currentProbIndex < problems.length) {
       timer = setInterval(() => {
         setTimeLeft((prev) => {
-          if (prev <= 1) {
-            handleTimeout();
-            return 60;
-          }
+          if (prev <= 1) { handleTimeout(); return 60; }
           return prev - 1;
         });
       }, 1000);
@@ -225,7 +225,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
   useEffect(() => {
     if (!loading && mfRef.current && matchStatus === 'active') {
       setTimeout(() => {
-         if (mfRef.current) mfRef.current.focus({ preventScroll: true });
+        if (mfRef.current) mfRef.current.focus({ preventScroll: true });
       }, 50);
     }
   }, [loading, matchStatus]);
@@ -236,7 +236,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     const currentProb = problems[currentProbIndex];
     const isCorrect = checkAnswer(userAnswer, currentProb.answer);
     submitResult(isCorrect);
-  }
+  };
 
   const confirmSurrender = async () => {
     setShowSurrenderModal(false);
@@ -252,7 +252,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     setProblems(sorted);
   }
 
-  // === ВЫДАЧА ОПЫТА В КОНЦЕ ТУРНИРНОГО БОЯ ===
+  // Выдача XP победителю
   useEffect(() => {
     if (matchStatus === 'finished' && winnerId === user?.id && !xpGained) {
       grantXp(user.id, profile?.is_premium || false, 50).then(res => {
@@ -261,8 +261,11 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     }
   }, [matchStatus, winnerId]);
 
-
-  if (loading) return <div className="flex h-full items-center justify-center"><Loader className="animate-spin text-cyan-400 w-10 h-10"/></div>;
+  if (loading) return (
+    <div className="flex h-full items-center justify-center">
+      <Loader className="animate-spin text-cyan-400 w-10 h-10" />
+    </div>
+  );
 
   if (matchStatus === 'finished' || currentProbIndex >= problems.length) {
     const isWinner = winnerId === user!.id;
@@ -273,18 +276,16 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
             <>
               <Trophy className="w-24 h-24 text-yellow-400 mx-auto mb-6 drop-shadow-[0_0_15px_rgba(250,204,21,0.5)]" />
               <h1 className="text-4xl font-black text-yellow-400 mb-4">{t('pvp.win')}</h1>
-              
               {xpGained && (
                 <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-full text-amber-400 font-bold mb-4 animate-pulse">
-                   <Zap className="w-4 h-4 fill-current" />
-                   +{xpGained} XP
+                  <Zap className="w-4 h-4 fill-current" />
+                  +{xpGained} XP
                 </div>
               )}
-
               {opponentDisconnected ? (
-                 <p className="text-emerald-300 mb-8">{t('pvp.opponent_resigned')}</p>
+                <p className="text-emerald-300 mb-8">{t('pvp.opponent_resigned')}</p>
               ) : (
-                 <p className="text-slate-300 mb-8">{t('pvp.pass_round')}</p>
+                <p className="text-slate-300 mb-8">{t('pvp.pass_round')}</p>
               )}
             </>
           ) : (
@@ -294,7 +295,6 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
               <p className="text-slate-300 mb-8">{t('pvp.good_game')}</p>
             </>
           )}
-         
           <div className="text-4xl font-mono font-bold text-white mb-8">
             {myScore} : {oppScore}
           </div>
@@ -308,10 +308,10 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
 
   const currentProb = problems[currentProbIndex];
   const questionText = i18n.language === 'kk' && currentProb.question_kz ? currentProb.question_kz : currentProb.question;
-  
+
   return (
     <div className="flex flex-col h-[100dvh] bg-slate-900 overflow-hidden">
-     
+
       {showSurrenderModal && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-red-500/30 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
@@ -329,10 +329,10 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
       )}
 
       {opponentDisconnected && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-4 py-2 rounded-full flex items-center gap-2 animate-bounce z-50 shadow-lg">
-            <WifiOff className="w-4 h-4" />
-            <span className="text-xs">{t('pvp.opponent_lost')}</span>
-          </div>
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-4 py-2 rounded-full flex items-center gap-2 animate-bounce z-50 shadow-lg">
+          <WifiOff className="w-4 h-4" />
+          <span className="text-xs">{t('pvp.opponent_lost')}</span>
+        </div>
       )}
 
       <div className="flex-shrink-0 bg-slate-900 border-b border-slate-800 shadow-lg z-10">
@@ -340,82 +340,76 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
           <button onClick={() => setShowSurrenderModal(true)} className="p-1.5 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-lg">
             <Flag className="w-4 h-4" />
           </button>
-          
           <div className="text-right">
             <div className="text-cyan-400 text-[10px] font-bold uppercase">{t('pvp.you')}</div>
             <div className="text-xl font-black text-white leading-none">{myScore}</div>
           </div>
-          
           <div className="flex flex-col items-center px-3">
-             <div className={`flex items-center gap-1 font-mono font-bold text-lg ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
-                <Timer className="w-3.5 h-3.5" /> {timeLeft}
-             </div>
-          </div>
-          
-          <div className="text-left">
-            <div className="text-red-400 text-[10px] font-bold truncate max-w-[70px] uppercase">
-               {opponentName}
+            <div className={`flex items-center gap-1 font-mono font-bold text-lg ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
+              <Timer className="w-3.5 h-3.5" /> {timeLeft}
             </div>
+          </div>
+          <div className="text-left">
+            <div className="text-red-400 text-[10px] font-bold truncate max-w-[70px] uppercase">{opponentName}</div>
             <div className="text-xl font-black text-white leading-none">{oppScore}</div>
           </div>
         </div>
 
         <div className="space-y-1 px-3 py-2 bg-slate-900">
-           <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-             <div className="h-full bg-cyan-500 transition-all duration-300" style={{ width: `${(currentProbIndex / (problems.length || 10)) * 100}%` }} />
-           </div>
-           <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-             <div className="h-full bg-red-500 transition-all duration-300" style={{ width: `${(oppProgress / (problems.length || 10)) * 100}%` }} />
-           </div>
+          <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+            <div className="h-full bg-cyan-500 transition-all duration-300" style={{ width: `${(currentProbIndex / (problems.length || 10)) * 100}%` }} />
+          </div>
+          <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+            <div className="h-full bg-red-500 transition-all duration-300" style={{ width: `${(oppProgress / (problems.length || 10)) * 100}%` }} />
+          </div>
         </div>
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center p-4 bg-slate-900 overflow-y-auto">
         {currentProb ? (
-           <div className="w-full max-w-lg">
-              <div className="bg-slate-800/50 backdrop-blur-sm border border-cyan-500/20 rounded-2xl p-6 shadow-xl text-center min-h-[150px] flex flex-col items-center justify-center">
-                <div className="text-2xl md:text-3xl font-bold text-white leading-relaxed tracking-wide">
-                  <Latex>{`$${questionText}$`}</Latex>
-                </div>
-                
-                <div className="mt-4 text-xs text-slate-500 font-mono uppercase tracking-widest">
-                  {t('pvp.solve_hint')}
-                </div>
+          <div className="w-full max-w-lg">
+            <div className="bg-slate-800/50 backdrop-blur-sm border border-cyan-500/20 rounded-2xl p-6 shadow-xl text-center min-h-[150px] flex flex-col items-center justify-center">
+              <div className="text-2xl md:text-3xl font-bold text-white leading-relaxed tracking-wide">
+                <Latex>{`$${questionText}$`}</Latex>
               </div>
-           </div>
+              <div className="mt-4 text-xs text-slate-500 font-mono uppercase tracking-widest">
+                {t('pvp.solve_hint')}
+              </div>
+            </div>
+          </div>
         ) : (
-           <div className="text-white text-sm animate-pulse flex items-center gap-2">
-             <Loader className="w-5 h-5 mx-auto mb-1 animate-spin" />
-             {t('pvp.loading_task')}
-           </div>
+          <div className="text-white text-sm animate-pulse flex items-center gap-2">
+            <Loader className="w-5 h-5 mx-auto mb-1 animate-spin" />
+            {t('pvp.loading_task')}
+          </div>
         )}
       </div>
 
       <div className="flex-shrink-0 bg-slate-900 border-t border-slate-800 shadow-2xl z-20 pb-safe">
         {feedback ? (
           <div className={`p-8 flex items-center justify-center gap-4 animate-in zoom-in duration-300 min-h-[320px] ${feedback === 'correct' ? 'bg-emerald-900/20' : 'bg-red-900/20'}`}>
-              <div className="text-center">
-                <div className={`text-3xl font-black mb-2 ${feedback === 'correct' ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {feedback === 'correct' ? t('pvp.win') : t('pvp.loss')}
-                </div>
+            <div className="text-center">
+              <div className={`text-3xl font-black mb-2 ${feedback === 'correct' ? 'text-emerald-400' : 'text-red-400'}`}>
+                {feedback === 'correct' ? t('pvp.win') : t('pvp.loss')}
               </div>
+            </div>
           </div>
         ) : (
           <div className="p-2">
-             <div className="mb-2 px-1">
-                <MathInput
-                   value={userAnswer}
-                   onChange={setUserAnswer}
-                   onSubmit={() => handleAnswer()}
-                   mfRef={mfRef}
-                />
-             </div>
-             <MathKeypad
-                onCommand={handleKeypadCommand}
-                onDelete={handleKeypadDelete}
-                onClear={handleKeypadClear}
+            <div className="mb-2 px-1">
+              <MathInput
+                value={userAnswer}
+                onChange={setUserAnswer}
                 onSubmit={() => handleAnswer()}
-             />
+                mfRef={mfRef}
+              />
+            </div>
+            <MathKeypad
+              onCommand={handleKeypadCommand}
+              onDelete={handleKeypadDelete}
+              onClear={handleKeypadClear}
+              onSubmit={() => handleAnswer()}
+            />
           </div>
         )}
       </div>
