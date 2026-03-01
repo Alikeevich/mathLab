@@ -58,7 +58,11 @@ export function CosmeticShop() {
     if (!error) {
       // Обновляем локально
       setOwnedIds(prev => new Set(prev).add(item.id));
-      refreshProfile(); // Обновит монеты в шапке
+      refreshProfile();// Обновит монеты в шапке
+      trackEvent(user.id, 'purchase_item', { 
+        item_id: item.id, 
+        item_name: item.name, 
+        price: item.price 
     } else {
       alert("Ошибка покупки");
     }
