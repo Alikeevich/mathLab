@@ -92,17 +92,28 @@ export function AdminDashboard({ onClose }: Props) {
       // === ПОДПИСКА НА ОНЛАЙН (Presence) ===
       presenceChannel = supabase.channel('online-users')
         .on('presence', { event: 'sync' }, () => {
-          const newState = presenceChannel.presenceState();
+          console.log('🔄 sync сработал');
+          const state = presenceChannel.presenceState();
+          console.log('📊 presenceState:', state);
+          
           const users: any[] = [];
-
-          for (const key in newState) {
-            if (newState[key] && newState[key][0]) {
-              users.push(newState[key][0]);
-            }
+          for (const key in state) {
+            if (state[key]?.[0]) users.push(state[key][0]);
           }
           setOnlineUsers(users);
         })
-        .subscribe();
+        .on('presence', { event: 'join' }, ({ newPresences }) => {
+          console.log('✅ join:', newPresences);
+        })
+        .subscribe(async (status) => {
+          console.log('📡 статус канала:', status);
+          if (status === 'SUBSCRIBED') {
+            await presenceChannel.track({ admin: true });
+            // читаем сразу после подписки
+            const state = presenceChannel.presenceState();
+            console.log('📊 state после подписки:', state);
+          }
+        });
     }
 
     return () => {
