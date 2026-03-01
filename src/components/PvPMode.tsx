@@ -186,6 +186,12 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     setMyScore(isP1 ? duel.player1_score : duel.player2_score);
     setCurrentProbIndex(isP1 ? duel.player1_progress : duel.player2_progress);
     setStatus('battle');
+      if (user) {
+        trackEvent(user.id, 'pvp_start', { 
+          opponent_type: isBotMatch ? 'bot' : 'human',
+          mmr: myMMR 
+        });
+      }
   }
 
   // === Matchmaking ===
@@ -215,6 +221,12 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
 
       startBattleSubscription(waitingDuel.id, 'player2');
       setStatus('battle');
+      if (user) {
+        trackEvent(user.id, 'pvp_start', { 
+          opponent_type: isBotMatch ? 'bot' : 'human',
+          mmr: myMMR 
+        });
+      }
       return;
     }
 
@@ -380,6 +392,14 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     if (isBotMatch && user && winnerId !== 'draw') {
       const newMMR = Math.max(0, (profile?.mmr ?? BASE_MMR) + change);
       await supabase.from('profiles').update({ mmr: newMMR }).eq('id', user.id);
+    }
+
+    if (user && winnerId !== 'draw') {
+      const isWin = isBotMatch ? winnerId === 'me' : winnerId === user.id;
+      trackEvent(user.id, isWin ? 'pvp_win' : 'pvp_loss', { 
+        mmr_change: change,
+        final_score: myScore 
+      });
     }
 
     const oldMMR = profile?.mmr ?? BASE_MMR;

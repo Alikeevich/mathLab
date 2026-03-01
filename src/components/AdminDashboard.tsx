@@ -35,6 +35,7 @@ export function AdminDashboard({ onClose }: Props) {
   const [b2bRequests, setB2BRequests] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
 
   // CRM / Аналитика
   const [stats, setStats] = useState<any>(null);
@@ -57,7 +58,9 @@ export function AdminDashboard({ onClose }: Props) {
     if (activeTab === 'users') fetchUsers();
     if (activeTab === 'requests') fetchRequests();
     if (activeTab === 'b2b') fetchB2B();
+
     let channel: any;
+    let presenceChannel: any;
 
     if (activeTab === 'analytics') {
       loadAnalytics();
@@ -69,7 +72,6 @@ export function AdminDashboard({ onClose }: Props) {
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'analytics_events' },
           async (payload) => {
-            // Когда кто-то заходит, подгружаем его имя
             const { data: userData } = await supabase
               .from('profiles')
               .select('username, role')
@@ -81,18 +83,31 @@ export function AdminDashboard({ onClose }: Props) {
               user: userData
             };
 
-            // Добавляем новое событие вверх списка
             setRecentEvents(prev => [newEvent, ...prev].slice(0, 20));
-            
-            // Обновляем счетчик DAU "на лету" (просто +1 визуально)
             setStats((prev: any) => ({ ...prev, dau: (prev?.dau || 0) + 1 }));
           }
         )
+        .subscribe();
+
+      // === ПОДПИСКА НА ОНЛАЙН (Presence) ===
+      presenceChannel = supabase.channel('online-users')
+        .on('presence', { event: 'sync' }, () => {
+          const newState = presenceChannel.presenceState();
+          const users: any[] = [];
+
+          for (const key in newState) {
+            if (newState[key] && newState[key][0]) {
+              users.push(newState[key][0]);
+            }
+          }
+          setOnlineUsers(users);
+        })
         .subscribe();
     }
 
     return () => {
       if (channel) supabase.removeChannel(channel);
+      if (presenceChannel) supabase.removeChannel(presenceChannel);
     };
   }, [activeTab]);
 
@@ -132,11 +147,9 @@ export function AdminDashboard({ onClose }: Props) {
 
   async function loadAnalytics() {
     setLoading(true);
-    // 1. Получаем общие цифры через SQL функцию
     const { data: metrics } = await supabase.rpc('get_crm_stats');
     if (metrics) setStats(metrics);
 
-    // 2. Получаем ленту событий
     const { data: events } = await supabase
       .from('analytics_events')
       .select('event_type, created_at, user:profiles(username, role)')
@@ -161,7 +174,6 @@ export function AdminDashboard({ onClose }: Props) {
     }
   }
 
-  // Открытие модалки с шаблоном текста
   const openActionModal = (req: TeacherRequest, type: 'approve' | 'reject') => {
     setSelectedReq(req);
     setActionType(type);
@@ -435,6 +447,23 @@ export function AdminDashboard({ onClose }: Props) {
               </h2>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+                {/* КАРТОЧКА: REALTIME ONLINE */}
+                <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-2 opacity-10">
+                    <div className="w-16 h-16 bg-green-500 rounded-full blur-xl animate-pulse" />
+                  </div>
+                  <div className="text-slate-400 text-xs font-bold uppercase mb-1 flex items-center gap-2">
+                    <span className="w-2 h-2 bg-green-500 rounded-full animate-ping" />
+                    Сейчас онлайн
+                  </div>
+                  <div className="text-4xl font-black text-white">{onlineUsers.length}</div>
+                  <div className="text-xs text-slate-500 mt-2 truncate">
+                    {onlineUsers.slice(0, 3).map(u => u.username).join(', ')}
+                    {onlineUsers.length > 3 && ` +${onlineUsers.length - 3}`}
+                  </div>
+                </div>
+
                 <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                   <div className="text-slate-400 text-xs font-bold uppercase mb-1">DAU (24ч)</div>
                   <div className="text-3xl font-black text-white">{stats.dau}</div>
@@ -452,6 +481,10 @@ export function AdminDashboard({ onClose }: Props) {
                   <div className="text-3xl font-black text-amber-400">{stats.conversion_rate}%</div>
                   <div className="text-xs text-slate-500 mt-1">Free → Premium</div>
                 </div>
+              </div>
+
+              {/* Retention отдельно под сеткой из 4 */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                   <div className="text-slate-400 text-xs font-bold uppercase mb-1">Retention (D1)</div>
                   <div className="text-3xl font-black text-purple-400">{stats.retention_rate}%</div>
