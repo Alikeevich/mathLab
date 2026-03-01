@@ -29,6 +29,7 @@ import { Header } from './components/Header';
 import { StickyReconnect } from './components/StickyReconnect';
 import { ErrorAnalyzer } from './components/ErrorAnalyzer';
 import { PricingPage } from './components/PricingPage';
+import { AnalyticsTracker } from './components/AnalyticsTracker';
 
 type View = 'map' | 'modules' | 'reactor' | 'pvp' | 'tournament_lobby' | 'analyzer';
 
@@ -504,6 +505,7 @@ function App() {
 
   return (
     <AuthProvider>
+      <AnalyticsTracker /> 
       {(() => {
         if (path === '/terms-and-conditions' || path === '/terms') {
           return <TermsPage />;
