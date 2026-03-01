@@ -215,6 +215,12 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
 
       startBattleSubscription(waitingDuel.id, 'player2');
       setStatus('battle');
+      if (user) {
+        trackEvent(user.id, 'pvp_start', { 
+          opponent_type: isBotMatch ? 'bot' : 'human',
+          mmr: myMMR 
+        });
+      }
       return;
     }
 
