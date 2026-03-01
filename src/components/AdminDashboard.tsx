@@ -42,11 +42,11 @@ export function AdminDashboard({ onClose }: Props) {
   const [processing, setProcessing] = useState(false);
 
   // Состояния для рассылки
-  const[msgTitle, setMsgTitle] = useState('');
+  const [msgTitle, setMsgTitle] = useState('');
   const [msgBody, setMsgBody] = useState('');
-  const[targetType, setTargetType] = useState('all');
+  const [targetType, setTargetType] = useState('all');
   const [targetUserId, setTargetUserId] = useState('');
-  const[sending, setSending] = useState(false);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'users') fetchUsers();
