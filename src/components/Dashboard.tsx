@@ -152,7 +152,6 @@ export function Dashboard({ onClose, onOpenLegal }: DashboardProps) {
   const roleInfo = getRoleDisplay();
   const RoleIcon = roleInfo.icon;
 
-  // ОБНОВЛЕННЫЙ СПИСОК ВОПРОСОВ (10 шт)
   const faqList = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
   return (
@@ -216,7 +215,7 @@ export function Dashboard({ onClose, onOpenLegal }: DashboardProps) {
                         <HelpCircle className="w-4 h-4" /> FAQ
                       </button>
 
-                      {/* КНОПКА ТАРИФЫ (НОВАЯ) */}
+                      {/* КНОПКА ТАРИФЫ */}
                       <a href="/pricing" className="px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 rounded-lg transition-all font-bold text-sm flex items-center gap-2">
                         <CreditCard className="w-4 h-4" /> {t('pricing.title')}
                       </a>
@@ -253,7 +252,7 @@ export function Dashboard({ onClose, onOpenLegal }: DashboardProps) {
                     <div className="hidden md:flex flex-col items-center bg-slate-900/50 p-4 rounded-2xl border border-white/5">
                       <img src="/meerkat/avatar.png" alt="Pet" className="w-16 h-16 object-contain mb-2" />
                       <div className="text-xs font-bold text-white">{profile.companion_name}</div>
-                      <div className="text-[10px] text-slate-500 uppercase">LVL {profile.companion_level || 1}</div>
+                      <div className="text-[10px] text-cyan-400 font-bold uppercase">SXP LVL {profile.companion_level || 1}</div>
                     </div>
                   )}
                 </div>
@@ -377,8 +376,9 @@ export function Dashboard({ onClose, onOpenLegal }: DashboardProps) {
           ) : null}
         </div>
 
-        {/* === FOOTER С ЮР. ДОКАМИ === */}
+        {/* === FOOTER С ЮР. ДОКАМИ + PRODUCT HUNT === */}
         <div className="mt-12 pt-8 border-t border-slate-800 shrink-0">
+          
           <div className="flex flex-wrap justify-center gap-x-8 gap-y-4">
             <button onClick={() => onOpenLegal('terms')} className="text-xs text-slate-500 hover:text-cyan-400 transition-colors flex items-center gap-1.5 uppercase font-bold tracking-wider">
               <FileText className="w-3 h-3" /> {t('legal_links.terms')}
@@ -390,6 +390,20 @@ export function Dashboard({ onClose, onOpenLegal }: DashboardProps) {
               <CreditCard className="w-3 h-3" /> {t('legal_links.refund')}
             </button>
           </div>
+
+          {/* Product Hunt Badge */}
+          <div className="flex justify-center mt-6 mb-4">
+            <a href="https://www.producthunt.com/products/mathlab-pvp?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-mathlab-pvp" target="_blank" rel="noopener noreferrer" className="hover:scale-105 transition-transform">
+              <img
+                src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1088067&theme=dark"
+                alt="MathLab PVP - Math battles that actually make you better at math | Product Hunt"
+                style={{ width: '250px', height: '54px' }}
+                width="250"
+                height="54"
+              />
+            </a>
+          </div>
+
           <div className="text-center mt-4 text-[10px] text-slate-700 font-mono">
             MathLab PvP © 2026. All Systems Operational.
           </div>
