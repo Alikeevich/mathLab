@@ -394,6 +394,14 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
       await supabase.from('profiles').update({ mmr: newMMR }).eq('id', user.id);
     }
 
+    if (user && winnerId !== 'draw') {
+      const isWin = isBotMatch ? winnerId === 'me' : winnerId === user.id;
+      trackEvent(user.id, isWin ? 'pvp_win' : 'pvp_loss', { 
+        mmr_change: change,
+        final_score: myScore 
+      });
+    }
+
     const oldMMR = profile?.mmr ?? BASE_MMR;
     setRevealOldMMR(oldMMR);
 
