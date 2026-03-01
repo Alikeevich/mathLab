@@ -40,6 +40,9 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
   const [xpGained, setXpGained] = useState<number | null>(null);
 
+  // Ref для хранения winner_id при финише без Realtime
+  const winnerIdRef = useRef<string | null>(null);
+
   // Таймер отключения соперника
   const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -115,7 +118,6 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
       setOppProgress(isP1 ? duel.player2_progress : duel.player1_progress);
       setLoading(false);
 
-      // Один канал — и postgres_changes, и Presence
       channel = supabase
         .channel(`t-duel-${duel.id}`)
         .on(
@@ -126,15 +128,14 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
             setOppScore(isP1 ? d.player2_score : d.player1_score);
             setOppProgress(isP1 ? d.player2_progress : d.player1_progress);
             if (d.status === 'finished') {
-              setMatchStatus('finished');
               setWinnerId(d.winner_id);
+              setMatchStatus('finished');
             }
           }
         )
         .on('presence', { event: 'leave' }, ({ leftPresences }) => {
           const oppLeft = (leftPresences as any[]).find(p => p.user_id !== user.id);
           if (oppLeft) {
-            // Даём 2 минуты на переподключение
             disconnectTimerRef.current = setTimeout(async () => {
               setOpponentDisconnected(true);
               await supabase.rpc('claim_timeout_win', {
@@ -174,6 +175,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     const newScore = isCorrect ? myScore + 1 : myScore;
     setMyScore(newScore);
     const newProgress = currentProbIndex + 1;
+    const isLastProblem = newProgress >= problems.length;
 
     try {
       await supabase.rpc('submit_pvp_move', {
@@ -182,8 +184,33 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
         is_correct: isCorrect,
         problem_idx: currentProbIndex,
       });
-      if (newProgress >= problems.length) {
-        await supabase.rpc('finish_duel', { duel_uuid: duelId, finisher_uuid: user.id });
+
+      if (isLastProblem) {
+        const { data: finishData } = await supabase.rpc('finish_duel', {
+          duel_uuid: duelId,
+          finisher_uuid: user.id,
+        });
+
+        // FIX: не ждём Realtime — сразу читаем финальный стейт из базы
+        const { data: finalDuel } = await supabase
+          .from('duels')
+          .select('winner_id, player1_score, player2_score, player1_id')
+          .eq('id', duelId)
+          .single();
+
+        if (finalDuel) {
+          const isP1 = finalDuel.player1_id === user.id;
+          setMyScore(isP1 ? finalDuel.player1_score : finalDuel.player2_score);
+          setOppScore(isP1 ? finalDuel.player2_score : finalDuel.player1_score);
+          setWinnerId(finalDuel.winner_id);
+        }
+
+        setTimeout(() => {
+          setFeedback(null);
+          setCurrentProbIndex(newProgress);
+          setMatchStatus('finished'); // <-- принудительно завершаем, не ждём Realtime
+        }, 1000);
+        return;
       }
     } catch (err) {
       console.error('Ошибка при отправке ответа:', err);
@@ -267,7 +294,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     </div>
   );
 
-  if (matchStatus === 'finished' || currentProbIndex >= problems.length) {
+  if (matchStatus === 'finished') {
     const isWinner = winnerId === user!.id;
     return (
       <div className="flex items-center justify-center h-full">
@@ -307,7 +334,11 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
   }
 
   const currentProb = problems[currentProbIndex];
-  const questionText = i18n.language === 'kk' && currentProb.question_kz ? currentProb.question_kz : currentProb.question;
+
+  // FIX: убираем обёртку $...$ — вопросы в базе уже содержат $ или текст без них
+  const questionText = i18n.language === 'kk' && currentProb?.question_kz
+    ? currentProb.question_kz
+    : currentProb?.question;
 
   return (
     <div className="flex flex-col h-[100dvh] bg-slate-900 overflow-hidden">
@@ -370,7 +401,8 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
           <div className="w-full max-w-lg">
             <div className="bg-slate-800/50 backdrop-blur-sm border border-cyan-500/20 rounded-2xl p-6 shadow-xl text-center min-h-[150px] flex flex-col items-center justify-center">
               <div className="text-2xl md:text-3xl font-bold text-white leading-relaxed tracking-wide">
-                <Latex>{`$${questionText}$`}</Latex>
+                {/* FIX: убрана обёртка $...$ — было $${questionText}$ */}
+                <Latex>{questionText}</Latex>
               </div>
               <div className="mt-4 text-xs text-slate-500 font-mono uppercase tracking-widest">
                 {t('pvp.solve_hint')}
