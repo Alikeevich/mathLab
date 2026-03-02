@@ -133,7 +133,6 @@ const resources = {
         calib_recorded: "Калибровочный матч записан.",
         result_recorded: "Результат учтен в калибровке.",
         status: "Ваш статус",
-        calibration: "Калибровка",
       },
       pricing: {
         title: "Тарифы",
@@ -409,7 +408,6 @@ const resources = {
         calib_recorded: "Калибрлеу матчы жазылды.",
         result_recorded: "Нәтиже калибрлеуде ескерілді.",
         status: "Сіздің мәртебеңіз",
-        calibration: "Калибрлеу",
       },
     pricing: {
         title: "Тарифтер",
