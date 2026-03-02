@@ -76,7 +76,7 @@ export function AdminDashboard({ onClose }: Props) {
               .select('username, role')
               .eq('id', payload.new.user_id)
               .single();
-            
+            if (userData?.username === 'Admin') return; // <-- сюда
             const newEvent = { ...payload.new, user: userData };
             setRecentEvents(prev => [newEvent, ...prev].slice(0, 20));
             setStats((prev: any) => ({ ...prev, dau: (prev?.dau || 0) + 1 }));
@@ -162,7 +162,7 @@ export function AdminDashboard({ onClose }: Props) {
       .order('created_at', { ascending: false })
       .limit(20);
       
-    if (events) setRecentEvents(events);
+    if (events) setRecentEvents(events.filter((e: any) => e.user?.username !== 'Admin'));
     setLoading(false);
   }
 
