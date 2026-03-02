@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
-    "@cortex-js/compute-engine": "^0.30.2",
+    "@cortex-js/compute-engine": "^0.26.0",
     "@google/generative-ai": "^0.24.1",
     "@paddle/paddle-js": "^1.6.2",
     "@supabase/supabase-js": "^2.57.4",
