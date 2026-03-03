@@ -562,7 +562,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
             <div className="flex justify-between text-[11px] font-bold uppercase tracking-wider">
               <span className="text-slate-500">Время поиска</span>
               <span className={remaining <= 2 ? 'text-amber-400' : 'text-slate-500'}>
-                {remaining > 0 ? `бот через ${remaining}с` : 'подбираем бота...'}
+                {remaining > 0 ? `соперник через ${remaining}с` : 'подбираем соперника...'}
               </span>
             </div>
             <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
@@ -589,7 +589,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
               { done: searchElapsed >= 1, text: 'Подключение к серверу' },
               { done: searchElapsed >= 2, text: 'Поиск соперника в рейтинге ±300 MP' },
               { done: searchElapsed >= 5, active: searchElapsed < 7, text: searchElapsed >= 7 ? 'Соперник не найден' : 'Ожидание игроков онлайн' },
-              { done: searchElapsed >= 7, text: 'Подбираем бота' },
+              { done: searchElapsed >= 7, text: 'Подбираем соперника' },
             ].map((step, i) => (
               <div key={i} className={`flex items-center gap-2 text-xs transition-all duration-300 ${
                 step.done ? 'text-slate-300' : 'text-slate-700'
