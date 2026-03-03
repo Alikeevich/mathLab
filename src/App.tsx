@@ -17,7 +17,6 @@ import { Leaderboard } from './components/Leaderboard';
 import { AnalyticsTracker } from './components/AnalyticsTracker';
 import { PricingPage } from './components/PricingPage';
 import { TermsPage } from './components/TermsPage';
-import { VsScreen } from './components/VsScreen';
 import { supabase } from './lib/supabase';
 import { Sector, Module } from './lib/supabase';
 import { Loader, Crown, Settings, Shield, Zap, Keyboard, Lock, ClipboardList } from 'lucide-react';
@@ -98,9 +97,6 @@ function MainApp() {
   const [showCompanionSetup, setShowCompanionSetup] = useState(false);
   const [showLegal, setShowLegal] = useState<'privacy' | 'terms' | 'refund' | null>(null);
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
-
-  // DEV: VS Screen preview
-  const [isDevVs, setIsDevVs] = useState(false);
 
   // Игровые сессии
   const [activeGameSession, setActiveGameSession] = useState<{ duelId: string; tournamentId?: string } | null>(null);
@@ -356,26 +352,6 @@ function MainApp() {
     );
   }
 
-  // DEV: VS Screen preview
-  if (isDevVs) {
-    const mockPlayer = profile || {
-      id: 'test',
-      username: 'DevPlayer',
-      mmr: 1050,
-      success_rate: 55,
-      clearance_level: 5,
-    } as any;
-
-    return (
-      <VsScreen
-        player={mockPlayer}
-        opponentName="Cyber_Demon_2077"
-        opponentMMR={1450}
-        onComplete={() => setIsDevVs(false)}
-      />
-    );
-  }
-
   // === Основной рендер приложения ===
   return (
     <div className="min-h-screen bg-slate-900 relative selection:bg-cyan-500/30">
@@ -556,14 +532,6 @@ function MainApp() {
           )}
         </div>
       )}
-
-      {/* DEV: VS Screen debug button */}
-      <button
-        onClick={() => setIsDevVs(true)}
-        className="fixed top-20 left-4 z-[9999] bg-red-600 text-white text-xs px-2 py-1 rounded shadow-lg opacity-50 hover:opacity-100"
-      >
-        DEBUG: VS SCREEN
-      </button>
 
       {/* Modals and overlays */}
       {user && (
