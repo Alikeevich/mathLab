@@ -1,4 +1,4 @@
-import { Trophy, Target } from 'lucide-react';
+import { Trophy, Target, Swords } from 'lucide-react';
 
 export type CardSkin = 'default' | 'electric' | 'fire' | 'gold' | string;
 
@@ -8,6 +8,7 @@ type PlayerCardProps = {
   mmr: number;
   rank: any;
   winRate: number;
+  matchesPlayed?: number;
   skin?: CardSkin;
   stage?: 'enter' | 'idle' | 'exit';
 };
@@ -18,6 +19,7 @@ export function PlayerCard({
   mmr,
   rank,
   winRate,
+  matchesPlayed = 0,
   skin = 'default',
   stage = 'idle',
 }: PlayerCardProps) {
@@ -180,22 +182,23 @@ export function PlayerCard({
             style={{ background: `linear-gradient(90deg, transparent, ${accentColor}40, transparent)` }}
           />
 
-          {/* Статы */}
-          <div className="w-full grid grid-cols-2 gap-2">
+          {/* Статы — 3 колонки */}
+          <div className="w-full grid grid-cols-3 gap-1.5">
             {[
-              { icon: <Trophy className="w-2.5 h-2.5" />, label: 'Rating', value: String(mmr), sub: 'MP' },
-              { icon: <Target  className="w-2.5 h-2.5" />, label: 'Winrate', value: `${winRate.toFixed(0)}%`, sub: 'WIN' },
+              { icon: <Trophy className="w-2.5 h-2.5" />, label: 'Rating',  value: String(mmr),           sub: 'MP'     },
+              { icon: <Target className="w-2.5 h-2.5" />,  label: 'Winrate', value: `${winRate}%`,          sub: 'WIN'    },
+              { icon: <Swords className="w-2.5 h-2.5" />,  label: 'Matches', value: String(matchesPlayed), sub: 'PLAYED' },
             ].map(({ icon, label, value, sub }) => (
               <div
                 key={label}
-                className="bg-black/35 rounded-xl px-3 py-2.5 border border-white/5 flex flex-col items-center gap-0.5"
+                className="bg-black/35 rounded-xl px-2 py-2.5 border border-white/5 flex flex-col items-center gap-0.5"
               >
-                <div className={`flex items-center gap-1 text-[9px] font-black uppercase tracking-widest ${labelClass}`}>
+                <div className={`flex items-center gap-1 text-[8px] font-black uppercase tracking-widest ${labelClass}`}>
                   {icon}
                   <span>{label}</span>
                 </div>
-                <span className="text-white font-black text-xl font-mono leading-tight">{value}</span>
-                <span className="text-slate-600 text-[8px] uppercase tracking-widest">{sub}</span>
+                <span className="text-white font-black text-base font-mono leading-tight">{value}</span>
+                <span className="text-slate-600 text-[7px] uppercase tracking-widest">{sub}</span>
               </div>
             ))}
           </div>
