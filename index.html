@@ -115,16 +115,6 @@
 
     <script type="module" src="/src/main.tsx"></script>
 
-    <!-- Регистрация SW: если используешь vite-plugin-pwa — плагин обычно сам регистрирует sw -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        // Если ты используешь VitePWA, этот вызов можно убрать.
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(()=>{/* noop */});
-        });
-      }
-    </script>
-
     <!-- Yandex.Metrika counter (оставлено как было) -->
     <script type="text/javascript">
         (function(m,e,t,r,i,k,a){
