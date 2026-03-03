@@ -189,12 +189,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
 
     // При реконнекте VS Screen не нужен, сразу в бой
     setStatus('battle');
-      if (user) {
-        trackEvent(user.id, 'pvp_start', { 
-          opponent_type: isBotMatch ? 'bot' : 'human',
-          mmr: myMMR 
-        });
-      }
   }
 
   // === Matchmaking ===
@@ -224,12 +218,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
 
       startBattleSubscription(waitingDuel.id, 'player2');
       setStatus('vs_screen');
-      if (user) {
-        trackEvent(user.id, 'pvp_start', { 
-          opponent_type: isBotMatch ? 'bot' : 'human',
-          mmr: myMMR 
-        });
-      }
       return;
     }
 
@@ -404,10 +392,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
 
     if (user && winnerId !== 'draw') {
       const isWin = isBotMatch ? winnerId === 'me' : winnerId === user.id;
-      trackEvent(user.id, isWin ? 'pvp_win' : 'pvp_loss', { 
-        mmr_change: change,
-        final_score: myScore 
-      });
     }
 
     const oldMMR = profile?.mmr ?? BASE_MMR;
