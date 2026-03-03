@@ -27,6 +27,7 @@
 
     <!-- PWA & Mobile settings -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="MathLab PvP" />
 
@@ -113,16 +114,6 @@
     </noscript>
 
     <script type="module" src="/src/main.tsx"></script>
-
-    <!-- Регистрация SW: если используешь vite-plugin-pwa — плагин обычно сам регистрирует sw -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        // Если ты используешь VitePWA, этот вызов можно убрать.
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(()=>{/* noop */});
-        });
-      }
-    </script>
 
     <!-- Yandex.Metrika counter (оставлено как было) -->
     <script type="text/javascript">
