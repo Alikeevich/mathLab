@@ -31,7 +31,7 @@ export function VsScreen({ player, opponentName, opponentMMR, onComplete }: Prop
     []
   );
 
-  const mySkin = player.is_premium ? 'electric' : 'default';
+  const mySkin = player.equipped_card_skin || 'default';
 
   return (
     <div className="fixed inset-0 z-[200] bg-slate-950 flex items-center justify-center p-4">
