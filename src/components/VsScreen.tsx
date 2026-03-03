@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { Profile } from '../lib/supabase';
 import { getPvPRank } from '../lib/gameLogic';
 import { PlayerCard } from './card-skins/PlayerCard';
+import { usePvPStats } from '../hooks/usePvPStats';
 
 type Props = {
   player: Profile;
@@ -17,26 +18,24 @@ export function VsScreen({ player, opponentName, opponentMMR, onComplete }: Prop
     const t1 = setTimeout(() => setStage('idle'), 100);
     const t2 = setTimeout(() => setStage('exit'), 3500);
     const t3 = setTimeout(onComplete, 4000);
-    return () => {
-      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
-    };
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [onComplete]);
 
-  const pRank = getPvPRank(player.mmr || 1000);
-  const oRank = getPvPRank(opponentMMR);
+  // Реальные PvP статы игрока
+  const myStats = usePvPStats(player.id);
 
-  // Фиксируем один раз, чтобы не вызывать бесконечный ре-рендер
-  const oWinRate = useMemo(
-    () => Math.min(95, Math.max(40, 50 + Math.random() * 20)),
-    []
-  );
+  // Фейковые статы соперника (данных нет — генерируем правдоподобные)
+  const oWinRate      = useMemo(() => Math.round(Math.min(95, Math.max(35, 50 + Math.random() * 25))), []);
+  const oMatches      = useMemo(() => Math.floor(Math.random() * 80 + 10), []);
 
-  const mySkin = player.equipped_card_skin || 'default';
+  const pRank  = getPvPRank(player.mmr || 1000);
+  const oRank  = getPvPRank(opponentMMR);
+  const mySkin = player.is_premium ? 'electric' : 'default';
 
   return (
     <div className="fixed inset-0 z-[200] bg-slate-950 flex items-center justify-center p-4">
 
-      {/* Статический фон */}
+      {/* Фон */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_#1e293b_0%,_#020617_100%)]" />
 
       {/* Контейнер карточек */}
@@ -48,7 +47,8 @@ export function VsScreen({ player, opponentName, opponentMMR, onComplete }: Prop
           name={player.username}
           mmr={player.mmr || 1000}
           rank={pRank}
-          winRate={player.success_rate}
+          winRate={myStats.winRate}
+          matchesPlayed={myStats.matchesPlayed}
           skin={mySkin}
           stage={stage}
         />
@@ -61,7 +61,7 @@ export function VsScreen({ player, opponentName, opponentMMR, onComplete }: Prop
             md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2
             transition-[transform,opacity] duration-500 ease-out
             ${stage === 'enter' ? 'scale-0 opacity-0' : 'scale-100 opacity-100'}
-            ${stage === 'exit' ? 'scale-0 opacity-0' : ''}
+            ${stage === 'exit'  ? 'scale-0 opacity-0' : ''}
           `}
         >
           <span className="text-black font-black text-3xl italic -ml-1">VS</span>
@@ -74,6 +74,7 @@ export function VsScreen({ player, opponentName, opponentMMR, onComplete }: Prop
           mmr={opponentMMR}
           rank={oRank}
           winRate={oWinRate}
+          matchesPlayed={oMatches}
           skin="electric"
           stage={stage}
         />
