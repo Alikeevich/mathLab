@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, Achievement } from '../lib/supabase';
+import { CardSkinShop } from './CardSkinShop';
 import {
   User, LogOut, Trophy, Target, TrendingUp, Award, Zap, Clock, CheckCircle2, 
   XCircle, X, Mail, ShieldCheck, GraduationCap, CreditCard, Loader, Shield, 
-  HelpCircle, ChevronDown, ChevronUp, ChevronLeft, FileText, ArrowRight
+  HelpCircle, ChevronDown, ChevronUp, ChevronLeft, FileText, ArrowRight, Palette
 } from 'lucide-react';
 import { BecomeTeacherModal } from './BecomeTeacherModal';
 
@@ -54,6 +55,7 @@ export function Dashboard({ onClose, onOpenLegal }: DashboardProps) {
   const [recentExperiments, setRecentExperiments] = useState<RecentExperiment[]>([]);
   
   const [showTeacherModal, setShowTeacherModal] = useState(false);
+  const [showCardShop, setShowCardShop] = useState(false);
   const [teacherRequestStatus, setTeacherRequestStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
   const [loadingRequest, setLoadingRequest] = useState(false);
 
@@ -219,6 +221,13 @@ export function Dashboard({ onClose, onOpenLegal }: DashboardProps) {
                       <a href="/pricing" className="px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 rounded-lg transition-all font-bold text-sm flex items-center gap-2">
                         <CreditCard className="w-4 h-4" /> {t('pricing.title')}
                       </a>
+
+                      <button 
+                        onClick={() => setShowCardShop(true)} 
+                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition-all font-bold text-sm flex items-center gap-2"
+                      >
+                        <Palette className="w-4 h-4" /> Стиль карточки
+                      </button>
 
                       {/* УЧИТЕЛЬСКИЕ КНОПКИ */}
                       {profile.role !== 'teacher' && profile.role !== 'admin' && (
@@ -410,6 +419,7 @@ export function Dashboard({ onClose, onOpenLegal }: DashboardProps) {
         </div>
 
         {showTeacherModal && <BecomeTeacherModal onClose={() => { setShowTeacherModal(false); checkTeacherRequest(); }} />}
+        {showCardShop && <CardSkinShop onClose={() => setShowCardShop(false)} />}
       </div>
     </div>
   );

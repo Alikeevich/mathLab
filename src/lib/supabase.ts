@@ -31,6 +31,7 @@ export type Profile = {
   // Гардероб
   equipped_hat: string | null;
   equipped_body: string | null;
+  equipped_card_skin: string | null;
   
   created_at: string;
   updated_at: string;

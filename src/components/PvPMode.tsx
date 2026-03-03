@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { VsScreen } from './VsScreen';
 import Latex from 'react-latex-next';
 import {
   Zap,
@@ -31,7 +32,7 @@ const BOT_UUID = 'c00d4ad6-1ed1-4195-b596-ac6960f3830a';
 const PVP_MODULE_ID = '00000000-0000-0000-0000-000000000099';
 const BASE_MMR = 700;
 
-type DuelState = 'lobby' | 'searching' | 'battle' | 'finished';
+type DuelState = 'lobby' | 'searching' | 'vs_screen' | 'battle' | 'finished';
 
 type Props = {
   onBack: () => void;
@@ -74,6 +75,10 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [showRankLegend, setShowRankLegend] = useState(false);
+
+  // Search timer
+  const [searchElapsed, setSearchElapsed] = useState(0);
+  const searchIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Rank Reveal (Calibration finish)
   const [showRevealModal, setShowRevealModal] = useState(false);
@@ -185,19 +190,20 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     await loadProblems(duel.problem_ids);
     setMyScore(isP1 ? duel.player1_score : duel.player2_score);
     setCurrentProbIndex(isP1 ? duel.player1_progress : duel.player2_progress);
+
+    // При реконнекте VS Screen не нужен, сразу в бой
     setStatus('battle');
-      if (user) {
-        trackEvent(user.id, 'pvp_start', { 
-          opponent_type: isBotMatch ? 'bot' : 'human',
-          mmr: myMMR 
-        });
-      }
   }
 
   // === Matchmaking ===
   async function findMatch() {
     setStatus('searching');
     setIsBotMatch(false);
+    setSearchElapsed(0);
+    if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
+    searchIntervalRef.current = setInterval(() => {
+      setSearchElapsed(prev => prev + 1);
+    }, 1000);
 
     const range = 300;
     const { data: waitingDuel } = await supabase
@@ -220,13 +226,8 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
       }).eq('id', waitingDuel.id);
 
       startBattleSubscription(waitingDuel.id, 'player2');
-      setStatus('battle');
-      if (user) {
-        trackEvent(user.id, 'pvp_start', { 
-          opponent_type: isBotMatch ? 'bot' : 'human',
-          mmr: myMMR 
-        });
-      }
+      if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
+      setStatus('vs_screen');
       return;
     }
 
@@ -249,7 +250,10 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
           const newData = payload.new;
           if (newData.status === 'active' && newData.player2_id && newData.player2_id !== BOT_UUID) {
             if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-            fetchOpponentData(newData.player2_id).then(() => setStatus('battle'));
+            fetchOpponentData(newData.player2_id).then(() => {
+              if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
+              setStatus('vs_screen');
+            });
           }
         })
       .subscribe();
@@ -257,12 +261,16 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     searchTimeoutRef.current = setTimeout(async () => {
       supabase.removeChannel(channel);
       const fakeBotMMR = myMMR + Math.floor(Math.random() * 100 - 50);
+      const resolvedBotName = getDeterministicBotName(newDuel.id);
       setOpponentMMR(fakeBotMMR);
+      setOpponentName(resolvedBotName);
+      setBotName(resolvedBotName);
       await supabase.from('duels').update({
         status: 'active', player2_id: BOT_UUID, player2_mmr: fakeBotMMR
       }).eq('id', newDuel.id);
       setIsBotMatch(true);
-      setStatus('battle');
+      if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
+      setStatus('vs_screen');
     }, 7000);
   }
 
@@ -396,10 +404,6 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
 
     if (user && winnerId !== 'draw') {
       const isWin = isBotMatch ? winnerId === 'me' : winnerId === user.id;
-      trackEvent(user.id, isWin ? 'pvp_win' : 'pvp_loss', { 
-        mmr_change: change,
-        final_score: myScore 
-      });
     }
 
     const oldMMR = profile?.mmr ?? BASE_MMR;
@@ -521,28 +525,116 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
 
   // 2. Searching
   if (status === 'searching') {
+    const BOT_TIMER = 7;
+    const progress = Math.min((searchElapsed / BOT_TIMER) * 100, 100);
+    const remaining = Math.max(BOT_TIMER - searchElapsed, 0);
+    const dots = '.'.repeat((searchElapsed % 3) + 1).padEnd(3, '\u00a0');
+
     return (
-      <div className="flex flex-col items-center justify-center h-full space-y-6 animate-in fade-in">
-        <Loader className="w-16 h-16 text-red-500 animate-spin" />
-        <h2 className="text-2xl font-bold text-white animate-pulse">
-          {initialDuelId ? t('pvp.reconnecting') : t('pvp.searching')}
-        </h2>
-        <div className="text-slate-400 text-sm max-w-xs text-center">
-          {t('pvp.wish')}
+      <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center p-6 animate-in fade-in duration-300">
+        {/* Фон */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_#1e293b_0%,_#020617_100%)]" />
+
+        <div className="relative z-10 flex flex-col items-center gap-8 w-full max-w-sm">
+
+          {/* Пульсирующий радар */}
+          <div className="relative w-32 h-32 flex items-center justify-center">
+            <div className="absolute inset-0 rounded-full border-2 border-red-500/20 animate-ping" style={{ animationDuration: '1.5s' }} />
+            <div className="absolute inset-2 rounded-full border border-red-500/30 animate-ping" style={{ animationDuration: '1.5s', animationDelay: '0.3s' }} />
+            <div className="absolute inset-4 rounded-full border border-red-500/20 animate-ping" style={{ animationDuration: '1.5s', animationDelay: '0.6s' }} />
+            <div className="w-16 h-16 rounded-full bg-red-500/10 border-2 border-red-500 flex items-center justify-center">
+              <Zap className="w-7 h-7 text-red-500 fill-current" />
+            </div>
+          </div>
+
+          {/* Заголовок */}
+          <div className="text-center">
+            <h2 className="text-2xl font-black text-white uppercase tracking-widest">
+              {initialDuelId ? 'Реконнект' : `Поиск${dots}`}
+            </h2>
+            <p className="text-slate-500 text-sm mt-1">
+              {myMMR} MP · {getPvPShortRank(myMMR)}
+            </p>
+          </div>
+
+          {/* Прогресс-бар + estimated time */}
+          <div className="w-full space-y-2">
+            <div className="flex justify-between text-[11px] font-bold uppercase tracking-wider">
+              <span className="text-slate-500">Время поиска</span>
+              <span className={remaining <= 2 ? 'text-amber-400' : 'text-slate-500'}>
+                {remaining > 0 ? `бот через ${remaining}с` : 'подбираем бота...'}
+              </span>
+            </div>
+            <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-1000 ease-linear"
+                style={{
+                  width: `${progress}%`,
+                  background: progress > 80
+                    ? 'linear-gradient(90deg,#7f1d1d,#ef4444)'
+                    : 'linear-gradient(90deg,#1e3a5f,#3b82f6)',
+                }}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] text-slate-700 font-mono">
+              <span>0с</span>
+              <span className="text-slate-600">{searchElapsed}с прошло</span>
+              <span>7с</span>
+            </div>
+          </div>
+
+          {/* Статус-строки */}
+          <div className="w-full space-y-1.5">
+            {[
+              { done: searchElapsed >= 1, text: 'Подключение к серверу' },
+              { done: searchElapsed >= 2, text: 'Поиск соперника в рейтинге ±300 MP' },
+              { done: searchElapsed >= 5, active: searchElapsed < 7, text: searchElapsed >= 7 ? 'Соперник не найден' : 'Ожидание игроков онлайн' },
+              { done: searchElapsed >= 7, text: 'Подбираем бота' },
+            ].map((step, i) => (
+              <div key={i} className={`flex items-center gap-2 text-xs transition-all duration-300 ${
+                step.done ? 'text-slate-300' : 'text-slate-700'
+              }`}>
+                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                  step.done ? 'bg-emerald-500' : 'bg-slate-700'
+                }`} />
+                {step.text}
+              </div>
+            ))}
+          </div>
+
+          {/* Кнопка отмены */}
+          <button
+            onClick={async () => {
+              if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+              if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
+              setSearchElapsed(0);
+              if (duelId && !initialDuelId) await supabase.from('duels').delete().eq('id', duelId);
+              setDuelId(null);
+              setStatus('lobby');
+            }}
+            className="px-8 py-2.5 border border-slate-700 rounded-full text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all text-sm font-bold uppercase tracking-wider"
+          >
+            Отмена
+          </button>
+
         </div>
-        <button onClick={async () => {
-          if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-          if (duelId && !initialDuelId) await supabase.from('duels').delete().eq('id', duelId);
-          setDuelId(null);
-          setStatus('lobby');
-        }} className="px-6 py-2 border border-slate-600 rounded-full text-slate-400 hover:bg-slate-800">
-          {t('pvp.cancel')}
-        </button>
       </div>
     );
   }
 
-  // 3. Battle
+  // 3. VS Screen
+  if (status === 'vs_screen') {
+    return (
+      <VsScreen
+        player={profile!}
+        opponentName={opponentName}
+        opponentMMR={opponentMMR}
+        onComplete={() => setStatus('battle')}
+      />
+    );
+  }
+
+  // 4. Battle
   if (status === 'battle') {
     const currentProb = problems[currentProbIndex];
 
@@ -674,7 +766,7 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     );
   }
 
-  // 4. Finished
+  // 5. Finished
   if (status === 'finished') {
     const isWin = winner === 'me';
     const isDraw = winner === 'draw';
