@@ -419,6 +419,7 @@ export function Dashboard({ onClose, onOpenLegal }: DashboardProps) {
         </div>
 
         {showTeacherModal && <BecomeTeacherModal onClose={() => { setShowTeacherModal(false); checkTeacherRequest(); }} />}
+        {showCardShop && <CardSkinShop onClose={() => setShowCardShop(false)} />}
       </div>
     </div>
   );
