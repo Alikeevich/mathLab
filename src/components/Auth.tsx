@@ -1,92 +1,179 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 import { containsBadWord } from '../lib/profanityFilter';
 import {
-  LogIn, UserPlus, Loader, Mail, CheckSquare, Square, Eye, EyeOff, CheckCircle,
+  Eye, EyeOff, Loader, CheckSquare, Square, CheckCircle, Mail,
+  ArrowLeft, Zap, Lock, User, Send,
 } from 'lucide-react';
 
 type Props = {
   onOpenLegal: (type: 'privacy' | 'terms' | 'refund') => void;
 };
 
-// ─── Проверка силы пароля ────────────────────────────────────────────────────
-function getPasswordStrength(password: string): { score: number; label: string; color: string } {
+type Screen = 'login' | 'register' | 'forgot' | 'email_sent' | 'reset_sent';
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function getPasswordStrength(password: string) {
   let score = 0;
   if (password.length >= 8) score++;
   if (password.length >= 12) score++;
   if (/[A-Z]/.test(password)) score++;
   if (/[0-9]/.test(password)) score++;
   if (/[^a-zA-Z0-9]/.test(password)) score++;
-
-  if (score <= 1) return { score, label: 'Слабый', color: 'bg-red-500' };
-  if (score <= 3) return { score, label: 'Средний', color: 'bg-yellow-500' };
-  return { score, label: 'Надёжный', color: 'bg-green-500' };
+  if (score <= 1) return { score, label: 'Слабый', color: 'bg-red-500', text: 'text-red-400' };
+  if (score <= 3) return { score, label: 'Средний', color: 'bg-yellow-500', text: 'text-yellow-400' };
+  return { score, label: 'Надёжный', color: 'bg-emerald-500', text: 'text-emerald-400' };
 }
 
-// ─── Валидация username ──────────────────────────────────────────────────────
-function validateUsername(value: string): string {
-  const trimmed = value.trim();
-  if (trimmed.length < 3) return 'Минимум 3 символа';
-  if (trimmed.length > 20) return 'Максимум 20 символов';
-  if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) return 'Только латиница, цифры и _';
-  if (containsBadWord(trimmed)) return 'Недопустимое имя пользователя';
+function validateUsername(value: string) {
+  const t = value.trim();
+  if (t.length < 3) return 'Минимум 3 символа';
+  if (t.length > 20) return 'Максимум 20 символов';
+  if (!/^[a-zA-Z0-9_]+$/.test(t)) return 'Только латиница, цифры и _';
+  if (containsBadWord(t)) return 'Недопустимое имя';
   return '';
 }
 
+// ── Декоративные символы ─────────────────────────────────────────────────────
+const MATH_SYMBOLS = ['∑', 'π', '∞', '√', '∫', 'Δ', 'θ', 'λ', '∂', 'φ'];
+
+function FloatingSymbols() {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
+      {MATH_SYMBOLS.map((sym, i) => (
+        <div
+          key={i}
+          className="absolute font-mono text-cyan-500/8 font-black"
+          style={{
+            fontSize: `${1.5 + (i % 4) * 0.8}rem`,
+            left: `${8 + (i * 9.3) % 84}%`,
+            top: `${5 + (i * 11.7) % 85}%`,
+            transform: `rotate(${(i * 37) % 60 - 30}deg)`,
+          }}
+        >
+          {sym}
+        </div>
+      ))}
+      {/* Grid dots */}
+      <div
+        className="absolute inset-0 opacity-[0.04]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #22d3ee 1px, transparent 1px)',
+          backgroundSize: '32px 32px',
+        }}
+      />
+    </div>
+  );
+}
+
+// ── Input компонент ───────────────────────────────────────────────────────────
+function Field({
+  label, icon: Icon, error, hint, children,
+}: {
+  label: string;
+  icon: React.ElementType;
+  error?: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="flex items-center gap-1.5 text-xs font-bold text-slate-400 uppercase tracking-widest">
+        <Icon className="w-3 h-3" />
+        {label}
+      </label>
+      {children}
+      {error && <p className="text-xs text-red-400 pl-1">{error}</p>}
+      {!error && hint && <p className="text-xs text-slate-600 pl-1">{hint}</p>}
+    </div>
+  );
+}
+
+function Input({
+  type = 'text', value, onChange, placeholder, required, suffix, className = '',
+}: {
+  type?: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  required?: boolean;
+  suffix?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className="relative">
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        required={required}
+        className={`w-full px-4 py-3 bg-slate-900/80 border border-slate-700 rounded-xl text-white
+          placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30
+          transition-all duration-200 text-sm ${suffix ? 'pr-12' : ''} ${className}`}
+      />
+      {suffix && (
+        <div className="absolute right-3 top-1/2 -translate-y-1/2">{suffix}</div>
+      )}
+    </div>
+  );
+}
+
+// ── Главный компонент ─────────────────────────────────────────────────────────
 export function Auth({ onOpenLegal }: Props) {
   const { t } = useTranslation();
   const { signIn, signUp } = useAuth();
 
-  const [isLogin, setIsLogin] = useState(true);
+  const [screen, setScreen] = useState<Screen>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
   const [agreed, setAgreed] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [usernameError, setUsernameError] = useState('');
-  const [emailSent, setEmailSent] = useState(false); // экран "проверьте почту"
 
-  const passwordStrength = getPasswordStrength(password);
+  const pwStrength = getPasswordStrength(password);
 
-  function handleUsernameChange(value: string) {
-    // Запрещаем вводить больше 20 символов физически
-    if (value.length > 20) return;
-    setUsername(value);
-    if (value.length > 0) {
-      setUsernameError(validateUsername(value));
-    } else {
-      setUsernameError('');
-    }
+  function reset() {
+    setError('');
+    setUsernameError('');
+    setPassword('');
+    setShowPassword(false);
   }
 
+  function goTo(s: Screen) {
+    reset();
+    setScreen(s);
+  }
+
+  function handleUsernameChange(v: string) {
+    if (v.length > 20) return;
+    setUsername(v);
+    setUsernameError(v.length > 0 ? validateUsername(v) : '');
+  }
+
+  // ── Логин / Регистрация ───────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
 
-    if (!isLogin && !agreed) {
-      setError(t('auth.error_agree'));
-      return;
-    }
-
-    if (!isLogin) {
+    if (screen === 'register') {
+      if (!agreed) { setError(t('auth.error_agree')); return; }
       const err = validateUsername(username);
-      if (err) {
-        setUsernameError(err);
-        return;
-      }
+      if (err) { setUsernameError(err); return; }
     }
 
     setLoading(true);
-
     try {
-      if (isLogin) {
+      if (screen === 'login') {
         await signIn(email, password);
       } else {
         await signUp(email, password, username);
-        setEmailSent(true); // ← показываем экран подтверждения
+        setScreen('email_sent');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Произошла ошибка');
@@ -95,228 +182,412 @@ export function Auth({ onOpenLegal }: Props) {
     }
   }
 
-  // ─── Экран "Проверьте почту" ─────────────────────────────────────────────
-  if (emailSent) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-slate-800/50 backdrop-blur-xl border border-cyan-500/30 rounded-2xl p-8 shadow-2xl text-center">
-          <div className="flex justify-center mb-6">
-            <div className="bg-gradient-to-br from-cyan-400 to-blue-500 p-4 rounded-full shadow-lg shadow-cyan-500/30">
-              <CheckCircle className="w-10 h-10 text-white" />
-            </div>
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-3">Проверьте почту</h2>
-          <p className="text-cyan-300/70 text-sm leading-relaxed mb-2">
-            Мы отправили письмо на
-          </p>
-          <p className="text-cyan-400 font-semibold mb-6 break-all">{email}</p>
-          <p className="text-slate-400 text-sm leading-relaxed mb-8">
-            Перейдите по ссылке в письме, чтобы активировать аккаунт. Если письмо не пришло — проверьте папку «Спам».
-          </p>
-          <button
-            onClick={() => {
-              setEmailSent(false);
-              setIsLogin(true);
-              setEmail('');
-              setPassword('');
-              setUsername('');
-              setAgreed(false);
-            }}
-            className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold py-3 rounded-lg transition-all"
-          >
-            Вернуться ко входу
-          </button>
-          <div className="mt-6">
-            <a href="mailto:support@mathlabpvp.org" className="flex items-center justify-center gap-2 text-slate-500 hover:text-cyan-400 transition-colors text-xs">
-              <Mail className="w-3 h-3" />
-              <span>support@mathlabpvp.org</span>
-            </a>
-          </div>
-        </div>
-      </div>
-    );
+  // ── Сброс пароля ─────────────────────────────────────────────────────────
+  async function handleForgot(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    if (!email) { setError('Введите email'); return; }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      setScreen('reset_sent');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка отправки письма');
+    } finally {
+      setLoading(false);
+    }
   }
 
-  // ─── Основная форма ──────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  // LAYOUT SHELL
+  // ════════════════════════════════════════════════════════════════════════════
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="relative w-full max-w-md">
-        <div className="bg-slate-800/50 backdrop-blur-xl border border-cyan-500/30 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative">
+      <FloatingSymbols />
 
-          <div className="flex items-center justify-center mb-8">
-            <div className="bg-gradient-to-br from-cyan-400 to-blue-500 p-3 rounded-xl shadow-lg shadow-cyan-500/20">
-              {isLogin ? <LogIn className="w-8 h-8 text-white" /> : <UserPlus className="w-8 h-8 text-white" />}
-            </div>
+      {/* Glow top-center */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="relative w-full max-w-md z-10">
+
+        {/* Logo / Brand */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 shadow-lg shadow-cyan-500/30 mb-4">
+            <Zap className="w-8 h-8 text-white fill-white" />
           </div>
-
-          <h1 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-            MathLab PvP
+          <h1 className="text-2xl font-black text-white tracking-tight">
+            Math<span className="text-cyan-400">Lab</span> <span className="text-slate-400 font-light">PvP</span>
           </h1>
-          <p className="text-cyan-300/60 text-center mb-8 text-sm">
-            {isLogin ? t('auth.login_title') : t('auth.register_title')}
+          <p className="text-slate-500 text-xs mt-1 tracking-widest uppercase">
+            Подготовка к ЕНТ нового поколения
           </p>
+        </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Card */}
+        <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
 
-            {/* ─── Username ─────────────────────────────────────────────── */}
-            {!isLogin && (
-              <div>
-                <label className="block text-cyan-300 text-sm font-medium mb-2">
-                  {t('auth.username')}
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => handleUsernameChange(e.target.value)}
-                    className={`w-full px-4 py-3 bg-slate-900/50 border rounded-lg text-white placeholder-cyan-300/30 focus:outline-none transition-all pr-16
-                      ${usernameError ? 'border-red-500/60 focus:border-red-400' : 'border-cyan-500/30 focus:border-cyan-400'}`}
-                    placeholder="Username"
-                    required={!isLogin}
+          {/* ── TAB SWITCHER (login / register) ───────────────────────────── */}
+          {(screen === 'login' || screen === 'register') && (
+            <div className="flex border-b border-slate-800">
+              {(['login', 'register'] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => goTo(s)}
+                  className={`flex-1 py-4 text-sm font-bold tracking-wide transition-all duration-200 ${
+                    screen === s
+                      ? 'text-cyan-400 border-b-2 border-cyan-400 bg-cyan-500/5'
+                      : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  {s === 'login' ? 'Войти' : 'Создать аккаунт'}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* ── BACK HEADER (forgot / sent screens) ───────────────────────── */}
+          {(screen === 'forgot' || screen === 'email_sent' || screen === 'reset_sent') && (
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-800">
+              {screen === 'forgot' && (
+                <button
+                  onClick={() => goTo('login')}
+                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-all"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+              )}
+              <span className="text-white font-bold text-sm">
+                {screen === 'forgot' && 'Восстановление пароля'}
+                {screen === 'email_sent' && 'Подтверди аккаунт'}
+                {screen === 'reset_sent' && 'Письмо отправлено'}
+              </span>
+            </div>
+          )}
+
+          <div className="p-6">
+
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* LOGIN */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {screen === 'login' && (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <Field label="Email" icon={Mail}>
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={setEmail}
+                    placeholder="your@email.com"
+                    required
                   />
-                  {/* Счётчик символов */}
-                  <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums
-                    ${username.length >= 20 ? 'text-red-400' : username.length >= 15 ? 'text-yellow-400' : 'text-slate-500'}`}>
-                    {username.length}/20
-                  </span>
+                </Field>
+
+                <Field label="Пароль" icon={Lock}>
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={setPassword}
+                    placeholder="••••••••"
+                    required
+                    suffix={
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="text-slate-500 hover:text-cyan-400 transition-colors"
+                        tabIndex={-1}
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    }
+                  />
+                </Field>
+
+                {/* Forgot link */}
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => goTo('forgot')}
+                    className="text-xs text-slate-500 hover:text-cyan-400 transition-colors"
+                  >
+                    Забыл пароль?
+                  </button>
                 </div>
-                {usernameError && (
-                  <p className="text-red-400 text-xs mt-1 pl-1">{usernameError}</p>
-                )}
-                {!usernameError && username.length > 0 && (
-                  <p className="text-cyan-300/40 text-xs mt-1 pl-1">Латиница, цифры и _ · 3–20 символов</p>
-                )}
-              </div>
+
+                {error && <ErrorBox>{error}</ErrorBox>}
+
+                <SubmitButton loading={loading}>Войти</SubmitButton>
+              </form>
             )}
 
-            {/* ─── Email ──────────────────────────────────────────────────── */}
-            <div>
-              <label className="block text-cyan-300 text-sm font-medium mb-2">{t('auth.email')}</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-900/50 border border-cyan-500/30 rounded-lg text-white placeholder-cyan-300/30 focus:outline-none focus:border-cyan-400 transition-all"
-                placeholder="your@email.com"
-                required
-              />
-            </div>
-
-            {/* ─── Password ───────────────────────────────────────────────── */}
-            <div>
-              <label className="block text-cyan-300 text-sm font-medium mb-2">{t('auth.password')}</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-900/50 border border-cyan-500/30 rounded-lg text-white placeholder-cyan-300/30 focus:outline-none focus:border-cyan-400 transition-all pr-12"
-                  placeholder="••••••••"
-                  required
-                  minLength={6}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-cyan-400 transition-colors"
-                  tabIndex={-1}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* REGISTER */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {screen === 'register' && (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <Field
+                  label="Имя игрока"
+                  icon={User}
+                  error={usernameError}
+                  hint={!usernameError && username.length > 0 ? 'Латиница, цифры и _ · 3–20 символов' : undefined}
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
+                  <Input
+                    value={username}
+                    onChange={handleUsernameChange}
+                    placeholder="YourNickname"
+                    required
+                    className={usernameError ? 'border-red-500/60 focus:border-red-400' : ''}
+                    suffix={
+                      <span className={`text-xs tabular-nums ${
+                        username.length >= 20 ? 'text-red-400' : username.length >= 15 ? 'text-yellow-400' : 'text-slate-600'
+                      }`}>
+                        {username.length}/20
+                      </span>
+                    }
+                  />
+                </Field>
 
-              {/* Индикатор силы пароля — только при регистрации */}
-              {!isLogin && password.length > 0 && (
-                <div className="mt-2">
-                  <div className="flex gap-1 mb-1">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <div
-                        key={i}
-                        className={`h-1 flex-1 rounded-full transition-all duration-300
-                          ${i <= passwordStrength.score ? passwordStrength.color : 'bg-slate-700'}`}
-                      />
-                    ))}
-                  </div>
-                  <p className={`text-xs pl-1
-                    ${passwordStrength.score <= 1 ? 'text-red-400' : passwordStrength.score <= 3 ? 'text-yellow-400' : 'text-green-400'}`}>
-                    {passwordStrength.label}
-                  </p>
-                </div>
-              )}
-            </div>
+                <Field label="Email" icon={Mail}>
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={setEmail}
+                    placeholder="your@email.com"
+                    required
+                  />
+                </Field>
 
-            {/* ─── Чекбокс соглашения ─────────────────────────────────────── */}
-            {!isLogin && (
-              <div className="flex items-start gap-3 pt-2">
+                <Field label="Пароль" icon={Lock}>
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={setPassword}
+                    placeholder="Минимум 6 символов"
+                    required
+                    suffix={
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="text-slate-500 hover:text-cyan-400 transition-colors"
+                        tabIndex={-1}
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    }
+                  />
+                  {/* Password strength */}
+                  {password.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      <div className="flex gap-1">
+                        {[1,2,3,4,5].map((i) => (
+                          <div
+                            key={i}
+                            className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+                              i <= pwStrength.score ? pwStrength.color : 'bg-slate-800'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <p className={`text-xs ${pwStrength.text}`}>{pwStrength.label}</p>
+                    </div>
+                  )}
+                </Field>
+
+                {/* Agreement */}
                 <button
                   type="button"
                   onClick={() => setAgreed(!agreed)}
-                  className={`mt-0.5 shrink-0 transition-colors ${agreed ? 'text-cyan-400' : 'text-slate-500 hover:text-slate-400'}`}
+                  className="flex items-start gap-2.5 w-full text-left group"
                 >
-                  {agreed ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
+                  <div className={`mt-0.5 flex-shrink-0 transition-colors ${
+                    agreed ? 'text-cyan-400' : 'text-slate-600 group-hover:text-slate-400'
+                  }`}>
+                    {agreed
+                      ? <CheckSquare className="w-4 h-4" />
+                      : <Square className="w-4 h-4" />}
+                  </div>
+                  <span className="text-xs text-slate-500 leading-relaxed group-hover:text-slate-400 transition-colors">
+                    Я принимаю{' '}
+                    <span
+                      onClick={(e) => { e.stopPropagation(); onOpenLegal('terms'); }}
+                      className="text-cyan-500 hover:underline cursor-pointer"
+                    >
+                      условия использования
+                    </span>
+                    {' '}и{' '}
+                    <span
+                      onClick={(e) => { e.stopPropagation(); onOpenLegal('privacy'); }}
+                      className="text-cyan-500 hover:underline cursor-pointer"
+                    >
+                      политику конфиденциальности
+                    </span>
+                  </span>
                 </button>
-                <div className="text-xs text-slate-400 leading-relaxed">
-                  {t('auth.agree_text')}{' '}
-                  <button type="button" onClick={() => onOpenLegal('terms')} className="text-cyan-400 hover:underline">{t('auth.terms')}</button>{' '}
-                  {t('auth.and')}{' '}
-                  <button type="button" onClick={() => onOpenLegal('privacy')} className="text-cyan-400 hover:underline">{t('auth.privacy')}</button>.
-                </div>
-              </div>
+
+                {error && <ErrorBox>{error}</ErrorBox>}
+
+                <SubmitButton loading={loading} disabled={!agreed || !!usernameError}>
+                  Создать аккаунт
+                </SubmitButton>
+              </form>
             )}
 
-            {/* ─── Ошибка ────────────────────────────────────────────────── */}
-            {error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
-                <p className="text-red-400 text-sm">{error}</p>
-              </div>
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* FORGOT PASSWORD */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {screen === 'forgot' && (
+              <form onSubmit={handleForgot} className="space-y-4">
+                <p className="text-slate-400 text-sm leading-relaxed">
+                  Введи свой email — мы отправим ссылку для сброса пароля.
+                </p>
+
+                <Field label="Email" icon={Mail}>
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={setEmail}
+                    placeholder="your@email.com"
+                    required
+                  />
+                </Field>
+
+                {error && <ErrorBox>{error}</ErrorBox>}
+
+                <SubmitButton loading={loading} icon={<Send className="w-4 h-4" />}>
+                  Отправить письмо
+                </SubmitButton>
+              </form>
             )}
 
-            {/* ─── Кнопка отправки ─────────────────────────────────────── */}
-            <button
-              type="submit"
-              disabled={loading || (!isLogin && !agreed) || (!isLogin && !!usernameError)}
-              className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-semibold py-3 rounded-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg"
-            >
-              {loading ? (
-                <>
-                  <Loader className="w-5 h-5 animate-spin" />
-                  {t('auth.btn_loading')}
-                </>
-              ) : (
-                <>{isLogin ? t('auth.btn_login') : t('auth.btn_register')}</>
-              )}
-            </button>
-          </form>
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* EMAIL SENT (после регистрации) */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {screen === 'email_sent' && (
+              <SuccessScreen
+                icon={<CheckCircle className="w-10 h-10 text-emerald-400" />}
+                glow="from-emerald-500/20 to-transparent"
+                title="Проверь почту!"
+                email={email}
+                description="Мы отправили письмо для подтверждения аккаунта. Перейди по ссылке, чтобы войти."
+                action={
+                  <button
+                    onClick={() => { reset(); setScreen('login'); }}
+                    className="w-full py-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold rounded-xl text-sm transition-all"
+                  >
+                    Войти после подтверждения
+                  </button>
+                }
+              />
+            )}
 
-          {/* ─── Переключатель ────────────────────────────────────────────── */}
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => {
-                setIsLogin(!isLogin);
-                setError('');
-                setAgreed(false);
-                setUsername('');
-                setUsernameError('');
-                setShowPassword(false);
-              }}
-              className="text-cyan-400 hover:text-cyan-300 text-sm transition-colors"
-            >
-              {isLogin ? t('auth.switch_to_reg') : t('auth.switch_to_login')}
-            </button>
-          </div>
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {/* RESET SENT (после запроса сброса) */}
+            {/* ══════════════════════════════════════════════════════════════ */}
+            {screen === 'reset_sent' && (
+              <SuccessScreen
+                icon={<Lock className="w-10 h-10 text-cyan-400" />}
+                glow="from-cyan-500/20 to-transparent"
+                title="Письмо отправлено"
+                email={email}
+                description="Перейди по ссылке в письме, чтобы задать новый пароль. Проверь папку «Спам»."
+                action={
+                  <button
+                    onClick={() => { reset(); setEmail(''); setScreen('login'); }}
+                    className="w-full py-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold rounded-xl text-sm transition-all"
+                  >
+                    <span className="flex items-center justify-center gap-2">
+                      <ArrowLeft className="w-4 h-4" /> Назад к входу
+                    </span>
+                  </button>
+                }
+              />
+            )}
 
-          <div className="mt-8 pt-6 border-t border-slate-700/50 flex justify-center">
-            <a href="mailto:support@mathlabpvp.org" className="flex items-center gap-2 text-slate-500 hover:text-cyan-400 transition-colors text-xs">
-              <Mail className="w-3 h-3" />
-              <span>support@mathlabpvp.org</span>
-            </a>
           </div>
         </div>
 
-        <div className="mt-6 text-center text-cyan-300/40 text-sm">
-          <p>{t('auth.footer')}</p>
+        {/* Footer */}
+        <div className="mt-6 text-center">
+          <a
+            href="mailto:support@mathlabpvp.org"
+            className="text-xs text-slate-600 hover:text-slate-400 transition-colors inline-flex items-center gap-1.5"
+          >
+            <Mail className="w-3 h-3" />
+            support@mathlabpvp.org
+          </a>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Переиспользуемые части ────────────────────────────────────────────────────
+function ErrorBox({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-2.5 p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
+      <div className="w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 flex-shrink-0" />
+      <p className="text-red-400 text-sm leading-snug">{children}</p>
+    </div>
+  );
+}
+
+function SubmitButton({
+  loading, disabled, children, icon,
+}: {
+  loading: boolean;
+  disabled?: boolean;
+  children: React.ReactNode;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <button
+      type="submit"
+      disabled={loading || disabled}
+      className="w-full py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500
+        disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed
+        text-white font-bold rounded-xl transition-all duration-200 shadow-lg shadow-cyan-900/30
+        active:scale-[0.98] flex items-center justify-center gap-2 text-sm"
+    >
+      {loading
+        ? <><Loader className="w-4 h-4 animate-spin" /> Загрузка...</>
+        : <>{icon}{children}</>}
+    </button>
+  );
+}
+
+function SuccessScreen({
+  icon, glow, title, email, description, action,
+}: {
+  icon: React.ReactNode;
+  glow: string;
+  title: string;
+  email: string;
+  description: string;
+  action: React.ReactNode;
+}) {
+  return (
+    <div className="text-center space-y-5">
+      {/* Icon glow */}
+      <div className="relative flex justify-center">
+        <div className={`absolute inset-0 bg-gradient-radial ${glow} blur-2xl`} />
+        <div className="relative w-20 h-20 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center">
+          {icon}
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-xl font-black text-white mb-1">{title}</h2>
+        <p className="text-cyan-400 font-mono text-sm font-semibold break-all">{email}</p>
+      </div>
+
+      <p className="text-slate-400 text-sm leading-relaxed">{description}</p>
+
+      {action}
+
+      <p className="text-slate-600 text-xs">
+        Не пришло? Проверь папку <span className="text-slate-500">«Спам»</span>
+      </p>
     </div>
   );
 }
