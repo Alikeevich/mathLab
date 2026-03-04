@@ -191,7 +191,7 @@ export function Auth({ onOpenLegal }: Props) {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         // Указываем точный боевой URL сайта
-        redirectTo: 'https://mathlabpvp.org/',
+        redirectTo: 'https://mathlabpvp.org/reset-password',
       });
       if (error) throw error;
       setScreen('reset_sent');
