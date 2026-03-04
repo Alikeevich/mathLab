@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, Loader, Shield, RefreshCw } from 'lucide-react';
+import { Users, Loader, Shield, RefreshCw, Clock, Trophy, Zap } from 'lucide-react';
 import { TournamentBracket } from './TournamentBracket';
 import { TournamentPlay } from './TournamentPlay';
 import { ReconnectModal } from './ReconnectModal';
@@ -18,96 +18,155 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
   const [participants, setParticipants] = useState<any[]>([]);
   const [tournamentCode, setTournamentCode] = useState<string>('');
   const [status, setStatus] = useState<'waiting' | 'active' | 'finished'>('waiting');
+  const [currentRound, setCurrentRound] = useState<number>(1);
   const [activeDuelId, setActiveDuelId] = useState<string | null>(null);
+
+  // BYE: игрок проходит автоматически в этом раунде
+  const [isByeRound, setIsByeRound] = useState(false);
+
+  // После матча — ждёт пока учитель нажмёт "Следующий раунд"
+  const [waitingForNextRound, setWaitingForNextRound] = useState(false);
 
   const [showReconnect, setShowReconnect] = useState(false);
   const [reconnectTournamentId, setReconnectTournamentId] = useState<string | null>(null);
   const [reconnectDuelId, setReconnectDuelId] = useState<string | null>(null);
   const [hasCheckedReconnect, setHasCheckedReconnect] = useState(false);
 
-  // Debounce: при старте турнира Realtime шлёт событие на каждую новую дуэль
-  // (10 игроков = 5 событий одновременно). Без debounce — 5 параллельных запросов.
   const duelCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevRoundRef = useRef<number>(1);
 
+  // ── Проверка: есть ли активная дуэль или BYE в этом раунде ──
   const checkForActiveDuel = useCallback(async () => {
     if (!user) return;
     if (duelCheckTimerRef.current) clearTimeout(duelCheckTimerRef.current);
     duelCheckTimerRef.current = setTimeout(async () => {
-      const { data } = await supabase
+      // 1. Ищем активный матч
+      const { data: activeDuel } = await supabase
         .from('duels')
         .select('id')
         .eq('tournament_id', tournamentId)
         .eq('status', 'active')
         .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
         .maybeSingle();
-      setActiveDuelId(data?.id ?? null);
+
+      if (activeDuel?.id) {
+        setIsByeRound(false);
+        setWaitingForNextRound(false);
+        setActiveDuelId(activeDuel.id);
+        return;
+      }
+
+      // 2. Ищем BYE в текущем раунде (player2_id IS NULL, winner_id = user)
+      const { data: tInfo } = await supabase
+        .from('tournaments')
+        .select('current_round')
+        .eq('id', tournamentId)
+        .single();
+
+      const round = tInfo?.current_round ?? 1;
+
+      const { data: byeDuel } = await supabase
+        .from('duels')
+        .select('id, winner_id, player2_id')
+        .eq('tournament_id', tournamentId)
+        .eq('round', round)
+        .eq('player1_id', user.id)
+        .is('player2_id', null)
+        .maybeSingle();
+
+      if (byeDuel && byeDuel.winner_id === user.id) {
+        setIsByeRound(true);
+        setActiveDuelId(null);
+      }
     }, 300);
-  }, [user, tournamentId]);
+  }, [tournamentId, user]);
 
   const fetchParticipants = useCallback(async () => {
     const { data } = await supabase
       .from('tournament_participants')
-      .select('*, profiles(username, mmr)')
+      .select('*, profiles(username, mmr, clearance_level)')
       .eq('tournament_id', tournamentId);
     if (data) setParticipants(data);
   }, [tournamentId]);
 
+  // ── Init ─────────────────────────────────────────────────────
   useEffect(() => {
-    async function loadInfo() {
-      if (!user) return;
-      const { data } = await supabase.from('tournaments').select('*').eq('id', tournamentId).single();
-      if (data) {
-        setTournamentCode(data.code);
-        setStatus(data.status);
-      }
-      fetchParticipants();
-      checkForActiveDuel();
-    }
+    if (!user) return;
 
-    async function checkActiveTournament() {
-      if (!user || hasCheckedReconnect) return;
+    async function init() {
+      // Проверяем реконнект к другому турниру
+      const savedTId = sessionStorage.getItem('reconnecting_tournament');
+      const savedDuelId = sessionStorage.getItem('active_duel_id');
 
-      const { data: participation, error } = await supabase
-        .from('tournament_participants')
-        .select('tournament_id, tournaments(status)')
-        .eq('user_id', user.id)
-        .neq('tournament_id', tournamentId)
-        .in('tournaments.status', ['active', 'waiting'])
-        .maybeSingle();
-
-      setHasCheckedReconnect(true);
-
-      if (error || !participation) {
-        loadInfo();
+      if (savedTId && savedTId !== tournamentId) {
+        setReconnectTournamentId(savedTId);
+        setShowReconnect(true);
+        setHasCheckedReconnect(true);
         return;
       }
-
-      if (['active', 'waiting'].includes((participation.tournaments as any)?.status)) {
-        setReconnectTournamentId(participation.tournament_id);
-
+      if (savedDuelId) {
+        sessionStorage.removeItem('active_duel_id');
         const { data: duel } = await supabase
           .from('duels')
-          .select('id')
-          .eq('tournament_id', participation.tournament_id)
-          .eq('status', 'active')
-          .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
+          .select('id, status, tournament_id')
+          .eq('id', savedDuelId)
           .maybeSingle();
-
-        if (duel) setReconnectDuelId(duel.id);
-        setShowReconnect(true);
-        return;
+        if (duel && duel.status === 'active' && duel.tournament_id === tournamentId) {
+          setReconnectDuelId(savedDuelId);
+          setShowReconnect(true);
+          setHasCheckedReconnect(true);
+          return;
+        }
       }
 
-      loadInfo();
+      sessionStorage.removeItem('reconnecting_tournament');
+      setHasCheckedReconnect(true);
+
+      // Загружаем инфо о турнире
+      const { data: tData } = await supabase
+        .from('tournaments')
+        .select('code, status, current_round')
+        .eq('id', tournamentId)
+        .single();
+
+      if (tData) {
+        setTournamentCode(tData.code);
+        setStatus(tData.status);
+        setCurrentRound(tData.current_round ?? 1);
+        prevRoundRef.current = tData.current_round ?? 1;
+        if (tData.status === 'active') checkForActiveDuel();
+      }
+
+      await fetchParticipants();
     }
 
-    checkActiveTournament();
+    init();
+  }, [tournamentId, user, checkForActiveDuel, fetchParticipants]);
+
+  // ── Realtime подписки ────────────────────────────────────────
+  useEffect(() => {
+    if (!user || !hasCheckedReconnect) return;
 
     const tourSub = supabase
       .channel(`tour-status-${tournamentId}`)
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'tournaments', filter: `id=eq.${tournamentId}` },
-        (payload) => setStatus(payload.new.status))
+        (payload) => {
+          const t = payload.new as any;
+          setStatus(t.status);
+          const newRound = t.current_round ?? 1;
+          setCurrentRound(newRound);
+
+          // Учитель нажал "Следующий раунд" — сбрасываем ожидание и ищем новый матч
+          if (newRound > prevRoundRef.current) {
+            prevRoundRef.current = newRound;
+            setWaitingForNextRound(false);
+            setIsByeRound(false);
+            setActiveDuelId(null);
+            // Небольшая задержка — дуэли могли только что создаться
+            setTimeout(() => checkForActiveDuel(), 800);
+          }
+        })
       .subscribe();
 
     const partSub = supabase
@@ -121,7 +180,10 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
       .channel(`tour-duels-${tournamentId}`)
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'duels', filter: `tournament_id=eq.${tournamentId}` },
-        () => checkForActiveDuel())
+        () => {
+          // Не делаем checkForActiveDuel если ждём следующего раунда
+          if (!waitingForNextRound) checkForActiveDuel();
+        })
       .subscribe();
 
     return () => {
@@ -130,22 +192,9 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
       supabase.removeChannel(partSub);
       supabase.removeChannel(duelSub);
     };
-  }, [tournamentId, user, hasCheckedReconnect, fetchParticipants, checkForActiveDuel]);
+  }, [tournamentId, user, hasCheckedReconnect, checkForActiveDuel, fetchParticipants, waitingForNextRound]);
 
-  if (activeDuelId) {
-    return (
-      <TournamentPlay
-        duelId={activeDuelId}
-        onFinished={() => {
-          setActiveDuelId(null);
-          fetchParticipants();
-          // Небольшая задержка: следующий раунд мог только что создаться
-          setTimeout(() => checkForActiveDuel(), 1500);
-        }}
-      />
-    );
-  }
-
+  // ── Реконнект ────────────────────────────────────────────────
   if (showReconnect) {
     return (
       <ReconnectModal
@@ -159,95 +208,155 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
           }
         }}
         onCancel={async () => {
+          sessionStorage.removeItem('reconnecting_tournament');
+          sessionStorage.removeItem('active_duel_id');
           setShowReconnect(false);
-          if (reconnectTournamentId && user) {
-            await supabase
-              .from('tournament_participants')
-              .delete()
-              .eq('user_id', user.id)
-              .eq('tournament_id', reconnectTournamentId);
-          }
-          const { data } = await supabase.from('tournaments').select('*').eq('id', tournamentId).single();
-          if (data) {
-            setTournamentCode(data.code);
-            setStatus(data.status);
-          }
-          fetchParticipants();
+          setHasCheckedReconnect(true);
           checkForActiveDuel();
         }}
       />
     );
   }
 
-  if (status === 'active' || status === 'finished') {
+  // ── Идёт матч ────────────────────────────────────────────────
+  if (activeDuelId) {
     return (
-      <div className="h-full p-4 md:p-8 flex flex-col">
-        {status === 'active' && !activeDuelId && (
-          <div className="bg-slate-800 p-4 text-center text-slate-400 mb-4 rounded-xl border border-slate-700 animate-pulse">
-            {t('tournaments.wait_other_matches')}
-          </div>
-        )}
-        <div className="flex-1 overflow-hidden">
-          <TournamentBracket
-            tournamentId={tournamentId}
-            onEnterMatch={(duelId) => setActiveDuelId(duelId)}
-          />
+      <TournamentPlay
+        duelId={activeDuelId}
+        onFinished={() => {
+          setActiveDuelId(null);
+          // После матча — ждём пока учитель нажмёт "Следующий раунд"
+          setWaitingForNextRound(true);
+          setIsByeRound(false);
+          fetchParticipants();
+        }}
+      />
+    );
+  }
+
+  // ── Турнир завершён ──────────────────────────────────────────
+  if (status === 'finished') {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center gap-6 p-8">
+        <Trophy className="w-24 h-24 text-yellow-400 drop-shadow-[0_0_20px_rgba(250,204,21,0.6)] animate-bounce" />
+        <h2 className="text-3xl font-black text-yellow-400 uppercase tracking-widest">Турнир завершён!</h2>
+        <div className="w-full max-w-2xl">
+          <TournamentBracket tournamentId={tournamentId} onEnterMatch={() => {}} isTeacher={false} />
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="flex items-center justify-center h-full p-4">
-      <div className="w-full max-w-5xl bg-slate-900/90 border border-cyan-500/30 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-cyan-500 via-purple-500 to-cyan-500 animate-pulse" />
-
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <Shield className="w-8 h-8 text-cyan-400" />
-              <h1 className="text-3xl font-black text-white uppercase italic">{t('tournaments.lobby_title')}</h1>
-            </div>
-            <p className="text-slate-400 text-sm">
-              {t('tournaments.code')}
-              <span className="text-cyan-400 font-mono font-bold text-lg ml-2">{tournamentCode}</span>
-            </p>
+  // ── BYE: автоматический проход ───────────────────────────────
+  if (status === 'active' && isByeRound) {
+    return (
+      <div className="w-full h-full flex flex-col">
+        {/* BYE-баннер */}
+        <div className="mx-4 mt-4 p-5 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center gap-4 animate-in fade-in duration-500">
+          <div className="p-3 bg-emerald-500/20 rounded-xl flex-shrink-0">
+            <Zap className="w-7 h-7 text-emerald-400" />
           </div>
-          <div className="flex items-center gap-3 bg-slate-800 px-6 py-3 rounded-full border border-slate-700">
-            <Loader className="w-5 h-5 text-cyan-400 animate-spin" />
-            <span className="text-white font-medium animate-pulse">{t('tournaments.waiting_host')}</span>
+          <div>
+            <div className="text-emerald-400 font-black text-lg">Автоматический проход!</div>
+            <div className="text-slate-300 text-sm mt-0.5">
+              В этом раунде нет соперника — ты проходишь дальше. Жди начала следующего раунда.
+            </div>
           </div>
         </div>
 
-        <div className="bg-slate-950/50 rounded-2xl p-6 border border-slate-800 min-h-[300px]">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-slate-400 text-sm uppercase tracking-wider font-bold">
-              {t('tournaments.participants')} ({participants.length})
-            </h3>
-            <div className="flex items-center gap-2">
-              <button onClick={fetchParticipants}
-                className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
-                title={t('tournaments.refresh')}>
-                <RefreshCw className="w-5 h-5" />
-              </button>
-              <Users className="w-5 h-5 text-slate-500" />
+        {/* Ожидание следующего раунда */}
+        <div className="mx-4 mt-3 p-4 bg-slate-800/60 border border-slate-700 rounded-2xl flex items-center gap-3">
+          <Clock className="w-5 h-5 text-slate-400 animate-pulse flex-shrink-0" />
+          <span className="text-slate-400 text-sm">Ожидание следующего раунда от учителя...</span>
+        </div>
+
+        {/* Сетка */}
+        <div className="flex-1 mt-4 px-4 pb-4 overflow-hidden">
+          <TournamentBracket tournamentId={tournamentId} onEnterMatch={() => {}} isTeacher={false} />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Ожидание следующего раунда после матча ───────────────────
+  if (status === 'active' && waitingForNextRound) {
+    return (
+      <div className="w-full h-full flex flex-col">
+        {/* Баннер ожидания */}
+        <div className="mx-4 mt-4 p-5 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl flex items-center gap-4 animate-in fade-in duration-500">
+          <div className="p-3 bg-cyan-500/20 rounded-xl flex-shrink-0">
+            <Clock className="w-7 h-7 text-cyan-400 animate-pulse" />
+          </div>
+          <div>
+            <div className="text-cyan-400 font-black text-lg">Раунд {currentRound} завершён</div>
+            <div className="text-slate-300 text-sm mt-0.5">
+              Ожидай — учитель запустит следующий раунд
             </div>
           </div>
+        </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {/* Сетка */}
+        <div className="flex-1 mt-4 px-4 pb-4 overflow-hidden">
+          <TournamentBracket tournamentId={tournamentId} onEnterMatch={() => {}} isTeacher={false} />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Ожидание старта ──────────────────────────────────────────
+  if (status === 'waiting') {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center gap-6 p-8 text-center">
+        <div className="relative">
+          <div className="w-24 h-24 rounded-full bg-cyan-500/10 border-2 border-cyan-500/30 flex items-center justify-center">
+            <Loader className="w-10 h-10 text-cyan-400 animate-spin" />
+          </div>
+        </div>
+        <div>
+          <h2 className="text-2xl font-black text-white mb-2">{t('tournaments.waiting_host')}</h2>
+          <p className="text-slate-400 text-sm">Код турнира: <span className="text-cyan-400 font-mono font-bold text-lg">{tournamentCode}</span></p>
+        </div>
+
+        <div className="w-full max-w-md bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Users className="w-4 h-4 text-slate-400" />
+            <span className="text-slate-400 text-sm font-medium">{t('tournaments.participants')}: {participants.length}</span>
+            <button onClick={fetchParticipants} className="ml-auto p-1.5 hover:bg-slate-700 rounded-lg transition-colors">
+              <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
+            </button>
+          </div>
+          <div className="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar">
             {participants.map((p) => (
-              <div key={p.id} className="flex items-center gap-3 p-3 rounded-xl border bg-slate-900 border-slate-700">
-                <div className="w-10 h-10 bg-gradient-to-br from-slate-700 to-slate-800 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                  {p.profiles?.username?.[0]?.toUpperCase() || '?'}
+              <div key={p.id} className="flex items-center gap-2 px-3 py-2 bg-slate-900/50 rounded-xl">
+                <div className="w-6 h-6 rounded-full bg-cyan-600/30 border border-cyan-600/50 flex items-center justify-center text-xs font-bold text-cyan-300">
+                  {(p.profiles?.username || '?')[0].toUpperCase()}
                 </div>
-                <div className="min-w-0">
-                  <div className="font-bold truncate text-slate-200">{p.profiles?.username || '...'}</div>
-                  <div className="text-[10px] text-slate-500 font-mono">{p.profiles?.mmr} MP</div>
-                </div>
+                <span className="text-slate-200 text-sm font-medium">{p.profiles?.username || 'Неизвестный'}</span>
+                <span className="ml-auto text-xs text-slate-500 font-mono">{p.profiles?.mmr ?? '—'} MP</span>
               </div>
             ))}
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // ── Активный турнир: лобби / ожидание своего матча ──────────
+  return (
+    <div className="w-full h-full flex flex-col">
+      {/* Баннер: ожидание своего матча */}
+      <div className="mx-4 mt-4 p-4 bg-slate-800/60 border border-slate-700 rounded-2xl flex items-center gap-3">
+        <Shield className="w-5 h-5 text-slate-400 flex-shrink-0" />
+        <span className="text-slate-300 text-sm">{t('tournaments.wait_other_matches')}</span>
+      </div>
+
+      {/* Сетка турнира */}
+      <div className="flex-1 mt-4 px-4 pb-4 overflow-hidden">
+        <TournamentBracket
+          tournamentId={tournamentId}
+          onEnterMatch={(duelId) => setActiveDuelId(duelId)}
+          isTeacher={false}
+        />
       </div>
     </div>
   );
