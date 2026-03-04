@@ -250,6 +250,16 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     }
   }, [loading, matchStatus]);
 
+  // АВТО-ВОЗВРАТ В ЛОББИ ЧЕРЕЗ 5 СЕКУНД ПОСЛЕ ФИНИША
+  useEffect(() => {
+    if (matchStatus === 'finished') {
+      const timer = setTimeout(() => {
+        onFinishedRef.current(); // Выкидывает обратно в сетку
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [matchStatus]);
+
   const handleAnswer = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (feedback || matchStatus === 'finished' || !userAnswer || userAnswer.trim() === '') return;
@@ -326,7 +336,7 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
             onClick={() => onFinishedRef.current()}
             className="w-full px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition-colors"
           >
-            {t('tournaments.bracket_title')}
+            {t('tournaments.bracket_title')} (Авто-выход через 5с...)
           </button>
         </div>
       </div>

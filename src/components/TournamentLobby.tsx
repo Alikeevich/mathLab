@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, Loader, Shield, RefreshCw, Clock, Trophy, Zap } from 'lucide-react';
+import { Users, Loader, Shield, RefreshCw, Clock, Trophy, Zap, ScanFace } from 'lucide-react';
 import { TournamentBracket } from './TournamentBracket';
 import { TournamentPlay } from './TournamentPlay';
 import { ReconnectModal } from './ReconnectModal';
@@ -16,7 +16,7 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
   const { user } = useAuth();
 
   const [participants, setParticipants] = useState<any[]>([]);
-  const [tournamentCode, setTournamentCode] = useState<string>('');
+  const[tournamentCode, setTournamentCode] = useState<string>('');
   const [status, setStatus] = useState<'waiting' | 'active' | 'finished'>('waiting');
   const [currentRound, setCurrentRound] = useState<number>(1);
   const [activeDuelId, setActiveDuelId] = useState<string | null>(null);
@@ -27,7 +27,7 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
   // После матча — ждёт пока учитель нажмёт "Следующий раунд"
   const [waitingForNextRound, setWaitingForNextRound] = useState(false);
 
-  const [showReconnect, setShowReconnect] = useState(false);
+  const[showReconnect, setShowReconnect] = useState(false);
   const [reconnectTournamentId, setReconnectTournamentId] = useState<string | null>(null);
   const [reconnectDuelId, setReconnectDuelId] = useState<string | null>(null);
   const [hasCheckedReconnect, setHasCheckedReconnect] = useState(false);
@@ -39,6 +39,7 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
   const checkForActiveDuel = useCallback(async () => {
     if (!user) return;
     if (duelCheckTimerRef.current) clearTimeout(duelCheckTimerRef.current);
+    
     duelCheckTimerRef.current = setTimeout(async () => {
       // 1. Ищем активный матч
       const { data: activeDuel } = await supabase
@@ -87,7 +88,7 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
       .select('*, profiles(username, mmr, clearance_level)')
       .eq('tournament_id', tournamentId);
     if (data) setParticipants(data);
-  }, [tournamentId]);
+  },[tournamentId]);
 
   // ── Init ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -141,14 +142,14 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
     }
 
     init();
-  }, [tournamentId, user, checkForActiveDuel, fetchParticipants]);
+  },[tournamentId, user, checkForActiveDuel, fetchParticipants]);
 
   // ── Realtime подписки ────────────────────────────────────────
   useEffect(() => {
     if (!user || !hasCheckedReconnect) return;
 
-    const tourSub = supabase
-      .channel(`tour-status-${tournamentId}`)
+    const channel = supabase.channel(`tour-lobby-${tournamentId}`)
+      // Подписка на изменение Турнира
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'tournaments', filter: `id=eq.${tournamentId}` },
         (payload) => {
@@ -157,42 +158,36 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
           const newRound = t.current_round ?? 1;
           setCurrentRound(newRound);
 
-          // Учитель нажал "Следующий раунд" — сбрасываем ожидание и ищем новый матч
+          // Если раунд сменился — сбрасываем ожидание и ищем новый матч
           if (newRound > prevRoundRef.current) {
             prevRoundRef.current = newRound;
             setWaitingForNextRound(false);
             setIsByeRound(false);
             setActiveDuelId(null);
-            // Небольшая задержка — дуэли могли только что создаться
-            setTimeout(() => checkForActiveDuel(), 800);
+            setTimeout(() => checkForActiveDuel(), 500);
           }
-        })
-      .subscribe();
-
-    const partSub = supabase
-      .channel(`tour-parts-${tournamentId}`)
+        }
+      )
+      // Подписка на Участников (кто-то зашел/вышел)
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'tournament_participants', filter: `tournament_id=eq.${tournamentId}` },
-        () => fetchParticipants())
-      .subscribe();
-
-    const duelSub = supabase
-      .channel(`tour-duels-${tournamentId}`)
+        () => fetchParticipants()
+      )
+      // Подписка на Матчи
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'duels', filter: `tournament_id=eq.${tournamentId}` },
         () => {
-          // Не делаем checkForActiveDuel если ждём следующего раунда
           if (!waitingForNextRound) checkForActiveDuel();
-        })
+        }
+      )
       .subscribe();
 
     return () => {
       if (duelCheckTimerRef.current) clearTimeout(duelCheckTimerRef.current);
-      supabase.removeChannel(tourSub);
-      supabase.removeChannel(partSub);
-      supabase.removeChannel(duelSub);
+      supabase.removeChannel(channel);
     };
-  }, [tournamentId, user, hasCheckedReconnect, checkForActiveDuel, fetchParticipants, waitingForNextRound]);
+  },[tournamentId, user, hasCheckedReconnect, checkForActiveDuel, fetchParticipants, waitingForNextRound]);
+
 
   // ── Реконнект ────────────────────────────────────────────────
   if (showReconnect) {
@@ -218,15 +213,14 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
     );
   }
 
-  // ── Идёт матч ────────────────────────────────────────────────
+  // ── Идёт матч (Внутри лобби рендерится TournamentPlay) ──────
   if (activeDuelId) {
     return (
       <TournamentPlay
         duelId={activeDuelId}
         onFinished={() => {
           setActiveDuelId(null);
-          // После матча — ждём пока учитель нажмёт "Следующий раунд"
-          setWaitingForNextRound(true);
+          setWaitingForNextRound(true); // Переключаем в режим "Ожидание следующего раунда"
           setIsByeRound(false);
           fetchParticipants();
         }}
@@ -237,10 +231,10 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
   // ── Турнир завершён ──────────────────────────────────────────
   if (status === 'finished') {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center gap-6 p-8">
+      <div className="w-full h-full flex flex-col items-center justify-center gap-6 p-4 md:p-8 animate-in zoom-in duration-500">
         <Trophy className="w-24 h-24 text-yellow-400 drop-shadow-[0_0_20px_rgba(250,204,21,0.6)] animate-bounce" />
-        <h2 className="text-3xl font-black text-yellow-400 uppercase tracking-widest">Турнир завершён!</h2>
-        <div className="w-full max-w-2xl">
+        <h2 className="text-3xl font-black text-yellow-400 uppercase tracking-widest text-center">Турнир завершён!</h2>
+        <div className="w-full max-w-4xl">
           <TournamentBracket tournamentId={tournamentId} onEnterMatch={() => {}} isTeacher={false} />
         </div>
       </div>
@@ -250,9 +244,8 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
   // ── BYE: автоматический проход ───────────────────────────────
   if (status === 'active' && isByeRound) {
     return (
-      <div className="w-full h-full flex flex-col">
-        {/* BYE-баннер */}
-        <div className="mx-4 mt-4 p-5 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center gap-4 animate-in fade-in duration-500">
+      <div className="w-full h-full flex flex-col animate-in fade-in duration-500 max-w-5xl mx-auto">
+        <div className="mx-4 mt-4 p-5 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center gap-4">
           <div className="p-3 bg-emerald-500/20 rounded-xl flex-shrink-0">
             <Zap className="w-7 h-7 text-emerald-400" />
           </div>
@@ -264,13 +257,11 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
           </div>
         </div>
 
-        {/* Ожидание следующего раунда */}
         <div className="mx-4 mt-3 p-4 bg-slate-800/60 border border-slate-700 rounded-2xl flex items-center gap-3">
           <Clock className="w-5 h-5 text-slate-400 animate-pulse flex-shrink-0" />
           <span className="text-slate-400 text-sm">Ожидание следующего раунда от учителя...</span>
         </div>
 
-        {/* Сетка */}
         <div className="flex-1 mt-4 px-4 pb-4 overflow-hidden">
           <TournamentBracket tournamentId={tournamentId} onEnterMatch={() => {}} isTeacher={false} />
         </div>
@@ -281,9 +272,8 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
   // ── Ожидание следующего раунда после матча ───────────────────
   if (status === 'active' && waitingForNextRound) {
     return (
-      <div className="w-full h-full flex flex-col">
-        {/* Баннер ожидания */}
-        <div className="mx-4 mt-4 p-5 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl flex items-center gap-4 animate-in fade-in duration-500">
+      <div className="w-full h-full flex flex-col animate-in fade-in duration-500 max-w-5xl mx-auto">
+        <div className="mx-4 mt-4 p-5 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl flex items-center gap-4">
           <div className="p-3 bg-cyan-500/20 rounded-xl flex-shrink-0">
             <Clock className="w-7 h-7 text-cyan-400 animate-pulse" />
           </div>
@@ -295,7 +285,6 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
           </div>
         </div>
 
-        {/* Сетка */}
         <div className="flex-1 mt-4 px-4 pb-4 overflow-hidden">
           <TournamentBracket tournamentId={tournamentId} onEnterMatch={() => {}} isTeacher={false} />
         </div>
@@ -303,54 +292,69 @@ export function TournamentLobby({ tournamentId }: LobbyProps) {
     );
   }
 
-  // ── Ожидание старта ──────────────────────────────────────────
+  // ── Ожидание старта в самом начале ───────────────────────────
   if (status === 'waiting') {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center gap-6 p-8 text-center">
-        <div className="relative">
-          <div className="w-24 h-24 rounded-full bg-cyan-500/10 border-2 border-cyan-500/30 flex items-center justify-center">
-            <Loader className="w-10 h-10 text-cyan-400 animate-spin" />
+      <div className="min-h-[80vh] flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-2xl bg-slate-900 border border-cyan-500/30 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden animate-in slide-in-from-bottom-10 duration-500">
+          <div className="text-center relative z-10 mb-8">
+            <div className="w-20 h-20 rounded-full bg-cyan-500/10 border-2 border-cyan-500/30 flex items-center justify-center mx-auto mb-4 relative">
+              <div className="absolute inset-0 rounded-full border-2 border-cyan-500/50 animate-ping" />
+              <Loader className="w-10 h-10 text-cyan-400 animate-spin" />
+            </div>
+            <h2 className="text-2xl md:text-3xl font-black text-white mb-2 uppercase tracking-wider">{t('tournaments.waiting_host')}</h2>
+            <p className="text-slate-400 text-sm">Код турнира: <span className="text-cyan-400 font-mono font-bold text-lg">{tournamentCode}</span></p>
           </div>
-        </div>
-        <div>
-          <h2 className="text-2xl font-black text-white mb-2">{t('tournaments.waiting_host')}</h2>
-          <p className="text-slate-400 text-sm">Код турнира: <span className="text-cyan-400 font-mono font-bold text-lg">{tournamentCode}</span></p>
-        </div>
 
-        <div className="w-full max-w-md bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Users className="w-4 h-4 text-slate-400" />
-            <span className="text-slate-400 text-sm font-medium">{t('tournaments.participants')}: {participants.length}</span>
-            <button onClick={fetchParticipants} className="ml-auto p-1.5 hover:bg-slate-700 rounded-lg transition-colors">
-              <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
-            </button>
-          </div>
-          <div className="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar">
-            {participants.map((p) => (
-              <div key={p.id} className="flex items-center gap-2 px-3 py-2 bg-slate-900/50 rounded-xl">
-                <div className="w-6 h-6 rounded-full bg-cyan-600/30 border border-cyan-600/50 flex items-center justify-center text-xs font-bold text-cyan-300">
-                  {(p.profiles?.username || '?')[0].toUpperCase()}
-                </div>
-                <span className="text-slate-200 text-sm font-medium">{p.profiles?.username || 'Неизвестный'}</span>
-                <span className="ml-auto text-xs text-slate-500 font-mono">{p.profiles?.mmr ?? '—'} MP</span>
+          <div className="w-full bg-slate-800/60 border border-slate-700 rounded-2xl p-5 relative z-10">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2 text-slate-300 font-bold">
+                <Users className="w-5 h-5 text-slate-400" />
+                {t('tournaments.participants')}
               </div>
-            ))}
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 bg-slate-900 rounded-lg text-cyan-400 font-mono font-bold border border-slate-700">
+                  {participants.length} ИГРОКОВ
+                </span>
+                <button onClick={fetchParticipants} className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors">
+                  <RefreshCw className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+              {participants.map((p) => {
+                const isMe = p.user_id === user?.id;
+                return (
+                  <div key={p.id} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${isMe ? 'bg-cyan-900/30 border-cyan-500/50' : 'bg-slate-900/50 border-slate-700'}`}>
+                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center shrink-0">
+                      <ScanFace className={`w-4 h-4 ${isMe ? 'text-cyan-400' : 'text-slate-500'}`} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-bold truncate text-sm text-white flex items-center gap-1">
+                        {p.profiles?.username || 'Неизвестный'}
+                        {isMe && <span className="text-[9px] bg-cyan-600 text-white px-1.5 py-0.5 rounded">ВЫ</span>}
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-mono">{p.profiles?.mmr ?? '—'} MP</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  // ── Активный турнир: лобби / ожидание своего матча ──────────
+  // ── Активный турнир: запасной стейт (ожидание своего матча) ──
   return (
-    <div className="w-full h-full flex flex-col">
-      {/* Баннер: ожидание своего матча */}
+    <div className="w-full h-full flex flex-col max-w-5xl mx-auto">
       <div className="mx-4 mt-4 p-4 bg-slate-800/60 border border-slate-700 rounded-2xl flex items-center gap-3">
         <Shield className="w-5 h-5 text-slate-400 flex-shrink-0" />
         <span className="text-slate-300 text-sm">{t('tournaments.wait_other_matches')}</span>
       </div>
 
-      {/* Сетка турнира */}
       <div className="flex-1 mt-4 px-4 pb-4 overflow-hidden">
         <TournamentBracket
           tournamentId={tournamentId}

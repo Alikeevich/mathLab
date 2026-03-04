@@ -612,6 +612,9 @@ function App() {
         if (path === '/pricing') {
           return <PricingPage />;
         }
+        if (path === '/reset-password') {
+          return <ResetPassword />;
+        }
         return <MainApp />;
       })()}
     </AuthProvider>
