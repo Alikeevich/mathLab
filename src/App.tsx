@@ -19,7 +19,7 @@ import { PricingPage } from './components/PricingPage';
 import { TermsPage } from './components/TermsPage';
 import { supabase } from './lib/supabase';
 import { Sector, Module } from './lib/supabase';
-import { Loader, Crown, Settings, Shield, Zap, Keyboard, Lock, ClipboardList } from 'lucide-react';
+import { Loader, Crown, Settings, Shield, Zap, Keyboard, Lock, ClipboardList, ArrowRight } from 'lucide-react';
 import 'katex/dist/katex.min.css';
 
 // =======================
