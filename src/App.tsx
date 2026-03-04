@@ -19,7 +19,7 @@ import { PricingPage } from './components/PricingPage';
 import { TermsPage } from './components/TermsPage';
 import { supabase } from './lib/supabase';
 import { Sector, Module } from './lib/supabase';
-import { Loader, Crown, Settings, Shield, Zap, Keyboard, Lock, ClipboardList } from 'lucide-react';
+import { Loader, Crown, Settings, Shield, Zap, Keyboard, Lock, ClipboardList, ArrowRight } from 'lucide-react';
 import 'katex/dist/katex.min.css';
 
 // =======================
@@ -397,6 +397,28 @@ function MainApp() {
               setActiveGameSession(null);
             }}
           />
+        )}
+
+        {/* Кнопка возврата в турнир (для участника без активной дуэли) */}
+        {activeTournamentId && !activeGameSession && view !== 'tournament_lobby' && (
+          <div className="fixed top-4 left-0 right-0 z-[190] flex justify-center px-4 pointer-events-none">
+            <div className="bg-slate-900/95 border-2 border-cyan-500/50 backdrop-blur-md rounded-2xl shadow-[0_0_25px_rgba(6,182,212,0.25)] p-3 flex items-center gap-3 max-w-sm w-full pointer-events-auto animate-in slide-in-from-top-full duration-500">
+              <div className="w-10 h-10 bg-cyan-500/20 rounded-full flex items-center justify-center flex-shrink-0 border border-cyan-500/40">
+                <Crown className="w-5 h-5 text-cyan-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-white font-bold text-sm leading-tight">Турнир идёт!</div>
+                <div className="text-slate-400 text-xs">Ты участник активного турнира</div>
+              </div>
+              <button
+                onClick={() => setView('tournament_lobby')}
+                className="flex-shrink-0 px-3 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-lg transition-colors shadow-lg flex items-center gap-1.5"
+              >
+                Войти
+                <ArrowRight className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Header */}
