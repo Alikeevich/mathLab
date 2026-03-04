@@ -250,6 +250,16 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     }
   }, [loading, matchStatus]);
 
+  // АВТО-ВОЗВРАТ В ЛОББИ ЧЕРЕЗ 5 СЕКУНД ПОСЛЕ ФИНИША
+  useEffect(() => {
+    if (matchStatus === 'finished') {
+      const timer = setTimeout(() => {
+        onFinishedRef.current(); // Выкидывает обратно в сетку
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [matchStatus]);
+
   const handleAnswer = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (feedback || matchStatus === 'finished' || !userAnswer || userAnswer.trim() === '') return;
