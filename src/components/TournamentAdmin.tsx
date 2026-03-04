@@ -254,7 +254,25 @@ export function TournamentAdmin({ onClose }: { onClose: () => void }) {
       .eq('tournament_id', id)
       .eq('status', 'active')
       .order('round', { ascending: false });
-    if (data) setActiveDuels(data);
+      
+    if (data) {
+      setActiveDuels(data);
+      
+      // АВТО-ПРОВЕРКА ФИНИША РАУНДА: 
+      // Если дуэлей больше нет, принудительно проверяем статус в базе
+      if (data.length === 0) {
+        const { data: tData } = await supabase
+          .from('tournaments')
+          .select('all_round_finished, status')
+          .eq('id', id)
+          .single();
+          
+        if (tData) {
+          setAllRoundFinished(tData.all_round_finished);
+          if (tData.status === 'finished') setStatus('finished');
+        }
+      }
+    }
   }
 
   // ── Старт ────────────────────────────────────────────────
