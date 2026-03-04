@@ -219,10 +219,10 @@ export function Auth({ onOpenLegal }: Props) {
             <Zap className="w-8 h-8 text-white fill-white" />
           </div>
           <h1 className="text-2xl font-black text-white tracking-tight">
-            Math<span className="text-cyan-400">Lab</span> <span className="text-slate-400 font-light">PvP</span>
+            Math<span className="text-cyan-400">Lab</span> <span className="text-slate-400 font-light">PVP</span>
           </h1>
           <p className="text-slate-500 text-xs mt-1 tracking-widest uppercase">
-            Подготовка к ЕНТ нового поколения
+            Подготовка к экзамену по математике нового поколения
           </p>
         </div>
 
