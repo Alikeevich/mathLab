@@ -188,12 +188,14 @@ export function CompanionLair({ onClose }: Props) {
                 <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase">
                   <Zap className="w-3 h-3 text-cyan-400" /> SXP
                 </div>
-                <span className="text-cyan-400 font-mono">{profile?.companion_xp}/100</span>
+                <span className="text-cyan-400 font-mono">
+                  {profile?.companion_xp}/{(profile?.companion_level || 1) * 100}
+                </span>
               </div>
               <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-700 ease-out" 
-                  style={{ width: `${profile?.companion_xp || 0}%` }} 
+                  style={{ width: `${Math.min(((profile?.companion_xp || 0) / ((profile?.companion_level || 1) * 100)) * 100, 100)}%` }}
                 />
               </div>
             </div>
