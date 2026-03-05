@@ -56,6 +56,8 @@ export function useBotOpponent({
   const [botProgress, setBotProgress] = useState(initialProgress);
   
   const timeouts = useRef<NodeJS.Timeout[]>([]);
+  const onUpdateRef = useRef(onProgressUpdate);
+  useEffect(() => { onUpdateRef.current = onProgressUpdate; }, [onProgressUpdate]);
 
   // Определяем настройки бота на основе ранга игрока
   const playerRank = getPvPRankByMMR(playerMMR);
