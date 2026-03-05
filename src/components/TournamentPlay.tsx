@@ -229,16 +229,20 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
 
   useEffect(() => {
     let timer: any;
-    if (matchStatus === 'active' && !feedback && currentProbIndex < problems.length) {
+    if (status === 'battle' && !feedback && currentProbIndex < problems.length) {
       timer = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) { handleTimeout(); return 60; }
-          return prev - 1;
-        });
+        setTimeLeft(prev => Math.max(0, prev - 1));
       }, 1000);
     }
     return () => clearInterval(timer);
-  }, [matchStatus, feedback, currentProbIndex, problems.length, handleTimeout]);
+  }, [status, feedback, currentProbIndex, problems.length]);
+
+  // Отдельно следит за нулем
+  useEffect(() => {
+    if (timeLeft === 0 && !feedback) {
+      handleTimeout();
+    }
+  },[timeLeft, feedback]); // handleTimeout обернут в useCallback
 
   useEffect(() => { setTimeLeft(60); }, [currentProbIndex]);
 
