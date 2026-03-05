@@ -1,4 +1,3 @@
-// src/App.tsx
 import { useState, useEffect, Suspense, lazy } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Auth } from './components/Auth';
@@ -17,6 +16,7 @@ import { Leaderboard } from './components/Leaderboard';
 import { AnalyticsTracker } from './components/AnalyticsTracker';
 import { PricingPage } from './components/PricingPage';
 import { TermsPage } from './components/TermsPage';
+import { ResetPassword } from './components/ResetPassword';
 import { supabase } from './lib/supabase';
 import { Sector, Module } from './lib/supabase';
 import { Loader, Crown, Settings, Shield, Zap, Keyboard, Lock, ClipboardList, ArrowRight } from 'lucide-react';
@@ -25,42 +25,15 @@ import 'katex/dist/katex.min.css';
 // =======================
 // LAZY (тяжёлые) КОМПОНЕНТЫ
 // =======================
-const ModuleViewer = lazy(() =>
-  import('./components/ModuleViewer').then(m => ({ default: m.ModuleViewer }))
-);
-
-const Reactor = lazy(() =>
-  import('./components/Reactor').then(m => ({ default: m.Reactor }))
-);
-
-const PvPMode = lazy(() =>
-  import('./components/PvPMode').then(m => ({ default: m.PvPMode }))
-);
-
-const TournamentLobby = lazy(() =>
-  import('./components/TournamentLobby').then(m => ({ default: m.TournamentLobby }))
-);
-
-const TournamentAdmin = lazy(() =>
-  import('./components/TournamentAdmin').then(m => ({ default: m.TournamentAdmin }))
-);
-
-const AdminGenerator = lazy(() =>
-  import('./components/AdminGenerator').then(m => ({ default: m.AdminGenerator }))
-);
-
-const VideoArchive = lazy(() =>
-  import('./components/VideoArchive').then(m => ({ default: m.VideoArchive }))
-);
-
-const AdminDashboard = lazy(() =>
-  import('./components/AdminDashboard').then(m => ({ default: m.AdminDashboard }))
-);
-
-const ErrorAnalyzer = lazy(() =>
-  import('./components/ErrorAnalyzer').then(m => ({ default: m.ErrorAnalyzer }))
-);
-
+const ModuleViewer = lazy(() => import('./components/ModuleViewer').then(m => ({ default: m.ModuleViewer })));
+const Reactor = lazy(() => import('./components/Reactor').then(m => ({ default: m.Reactor })));
+const PvPMode = lazy(() => import('./components/PvPMode').then(m => ({ default: m.PvPMode })));
+const TournamentLobby = lazy(() => import('./components/TournamentLobby').then(m => ({ default: m.TournamentLobby })));
+const TournamentAdmin = lazy(() => import('./components/TournamentAdmin').then(m => ({ default: m.TournamentAdmin })));
+const AdminGenerator = lazy(() => import('./components/AdminGenerator').then(m => ({ default: m.AdminGenerator })));
+const VideoArchive = lazy(() => import('./components/VideoArchive').then(m => ({ default: m.VideoArchive })));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
+const ErrorAnalyzer = lazy(() => import('./components/ErrorAnalyzer').then(m => ({ default: m.ErrorAnalyzer })));
 const PixelBlast = lazy(() => import('./components/PixelBlast'));
 
 // =======================
@@ -135,6 +108,14 @@ function MainApp() {
     }
   }
 
+  // === Сохраняем код турнира ПЕРЕД логином/регистрацией ===
+  useEffect(() => {
+    const tCode = new URLSearchParams(window.location.search).get('t');
+    if (tCode) {
+      sessionStorage.setItem('pending_tournament_code', tCode);
+    }
+  }, []);
+
   // === Проверка активных сессий + подписка на duels ===
   useEffect(() => {
     if (!user) {
@@ -142,6 +123,16 @@ function MainApp() {
       setActiveGameSession(null);
       setActiveTournamentId(null);
       return;
+    }
+
+    // Если есть сохраненный код турнира или в URL, заходим в него после логина
+    const urlCode = new URLSearchParams(window.location.search).get('t');
+    const pendingCode = sessionStorage.getItem('pending_tournament_code');
+    const codeToJoin = urlCode || pendingCode;
+
+    if (codeToJoin) {
+      joinTournament(codeToJoin);
+      sessionStorage.removeItem('pending_tournament_code'); // Очищаем после использования
     }
 
     let isMounted = true;
@@ -201,7 +192,6 @@ function MainApp() {
             setActiveGameSession(null);
           } else {
             if (newData.player1_id === user?.id || newData.player2_id === user?.id) {
-              // re-check to sync state
               checkActiveSession();
             }
           }
@@ -231,15 +221,6 @@ function MainApp() {
         }
       }
     };
-  }, [user]);
-
-  // === Проверка параметра ?t= (invite code) ===
-  useEffect(() => {
-    if (!user) return;
-    const tCode = new URLSearchParams(window.location.search).get('t');
-    if (tCode) {
-      joinTournament(tCode);
-    }
   }, [user]);
 
   // === Проверка прав ведущего/хоста турнира (teacher) ===
@@ -342,9 +323,9 @@ function MainApp() {
       <div className="relative">
         <button
           onClick={() => setShowAuthModal(false)}
-          className="absolute top-4 left-4 text-white z-50 p-2 bg-slate-800 rounded-full border border-slate-700"
+          className="absolute top-4 left-4 text-white z-50 p-2 bg-slate-800 rounded-full border border-slate-700 hover:bg-slate-700 transition-colors"
         >
-          ← Назад
+          <ArrowRight className="w-5 h-5 rotate-180" />
         </button>
         <Auth onOpenLegal={(type) => setShowLegal(type)} />
         {showLegal && <LegalModal type={showLegal} onClose={() => setShowLegal(null)} />}
@@ -445,7 +426,7 @@ function MainApp() {
                     <>
                       <button
                         onClick={() => setShowJoinCode(true)}
-                        className="p-3 bg-slate-800/90 backdrop-blur-md border-2 border-slate-600 rounded-2xl shadow-lg active:scale-95 transition-all"
+                        className="p-3 bg-slate-800/90 backdrop-blur-md border-2 border-slate-600 hover:bg-slate-700 hover:border-slate-500 rounded-2xl shadow-lg active:scale-95 transition-all"
                         title="Код турнира"
                       >
                         <Keyboard className="w-5 h-5 text-slate-400 hover:text-cyan-400 transition-colors" />
@@ -453,7 +434,7 @@ function MainApp() {
 
                       <button
                         onClick={() => setView('analyzer')}
-                        className="flex-1 bg-slate-800/90 backdrop-blur-md border-2 border-amber-500/50 rounded-2xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 group"
+                        className="flex-1 bg-slate-800/90 backdrop-blur-md border-2 border-amber-500/50 hover:bg-slate-800 hover:border-amber-400 rounded-2xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 group"
                         title="Журнал ошибок"
                       >
                         <ClipboardList className="w-5 h-5 text-amber-400 group-hover:text-amber-300 transition-colors" />
@@ -469,13 +450,13 @@ function MainApp() {
                       >
                         <div className="absolute inset-0 bg-red-600/10 group-hover:bg-red-600/20 transition-colors" />
                         <Zap className="w-6 h-6 text-red-500 fill-current animate-pulse" />
-                        <span className="font-black text-white text-base tracking-widest italic uppercase">
+                        <span className="font-black text-white text-base tracking-widest italic uppercase relative z-10 drop-shadow-md">
                           PVP
                         </span>
                       </button>
                     </>
                   ) : (
-                    <div className="bg-slate-900/90 border border-slate-700 px-6 py-3 rounded-full text-slate-400 text-sm flex items-center gap-2 backdrop-blur-md">
+                    <div className="bg-slate-900/90 border border-slate-700 px-6 py-3 rounded-full text-slate-400 text-sm flex items-center gap-2 backdrop-blur-md shadow-lg">
                       <Lock className="w-4 h-4" />
                       PvP и Турниры доступны после регистрации
                     </div>
@@ -527,28 +508,28 @@ function MainApp() {
         <div className="fixed bottom-28 right-4 z-50 flex flex-col gap-3">
           <button
             onClick={() => setShowTournamentAdmin(true)}
-            className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-full text-amber-400 hover:bg-amber-500 hover:text-black transition-all shadow-lg backdrop-blur-sm"
+            className="p-3 bg-amber-500/20 border border-amber-500/50 rounded-full text-amber-400 hover:bg-amber-500 hover:text-black transition-all shadow-lg backdrop-blur-sm group"
             title="Турниры"
           >
-            <Crown className="w-6 h-6" />
+            <Crown className="w-6 h-6 group-hover:scale-110 transition-transform" />
           </button>
 
           {profile?.role === 'admin' && (
             <>
               <button
                 onClick={() => setShowAdmin(true)}
-                className="p-3 bg-slate-800/90 border border-cyan-500/30 rounded-full text-cyan-400 shadow-lg backdrop-blur-sm hover:bg-cyan-500 hover:text-black transition-all"
+                className="p-3 bg-slate-800/90 border border-cyan-500/30 rounded-full text-cyan-400 shadow-lg backdrop-blur-sm hover:bg-cyan-500 hover:text-black transition-all group"
                 title="Генератор задач"
               >
-                <Settings className="w-6 h-6" />
+                <Settings className="w-6 h-6 group-hover:rotate-90 transition-transform duration-500" />
               </button>
 
               <button
                 onClick={() => setShowAdminDashboard(true)}
-                className="p-3 bg-red-600/20 border border-red-500/50 rounded-full text-red-400 shadow-lg backdrop-blur-sm hover:bg-red-600 hover:text-white transition-all"
+                className="p-3 bg-red-600/20 border border-red-500/50 rounded-full text-red-400 shadow-lg backdrop-blur-sm hover:bg-red-600 hover:text-white transition-all group"
                 title="Админ-центр"
               >
-                <Shield className="w-6 h-6" />
+                <Shield className="w-6 h-6 group-hover:scale-110 transition-transform" />
               </button>
             </>
           )}
