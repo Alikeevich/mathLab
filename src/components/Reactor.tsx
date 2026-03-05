@@ -181,8 +181,13 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
       });
 
       if (isCorrect) {
-        const xpResult = await grantXp(user.id, profile?.is_premium || false, 10);
-        if (xpResult) setXpGained(xpResult.gained);
+        // --- ИЗМЕНЕНИЕ НАЧАЛО ---
+        // Мы больше не вызываем grantXp, так как это делает SQL-триггер.
+        // Просто рассчитываем визуальное значение для игрока:
+        const isPremium = profile?.is_premium || false;
+        const visualXp = isPremium ? 20 : 10; // 10 база, 20 для премиум
+        setXpGained(visualXp);
+        // --- ИЗМЕНЕНИЕ КОНЕЦ ---
 
         if (forcedProblemIds) {
            await supabase.from('user_errors')
@@ -191,7 +196,8 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
              .eq('problem_id', currentProblem.id);
         }
 
-        setTimeout(() => refreshProfile(), 100);
+        // Задержка перед обновлением профиля, чтобы триггер успел отработать в базе
+        setTimeout(() => refreshProfile(), 500); // Чуть увеличили задержку для надежности
         
         if (!forcedProblemIds) {
             const { data: progressData } = await supabase.from('user_progress').select('*').eq('user_id', user.id).eq('module_id', module.id).maybeSingle();
