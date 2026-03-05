@@ -19,7 +19,10 @@ import { TermsPage } from './components/TermsPage';
 import { ResetPassword } from './components/ResetPassword';
 import { supabase } from './lib/supabase';
 import { Sector, Module } from './lib/supabase';
-import { Loader, Crown, Settings, Shield, Zap, Keyboard, Lock, ClipboardList, ArrowRight } from 'lucide-react';
+import { FriendlyDuelModal } from './components/FriendlyDuelModal';
+
+// Добавлена иконка Users
+import { Loader, Crown, Settings, Shield, Zap, Keyboard, Lock, ClipboardList, ArrowRight, Users } from 'lucide-react';
 import 'katex/dist/katex.min.css';
 
 // =======================
@@ -53,27 +56,30 @@ function MainApp() {
   // Навигация / выбор
   const [view, setView] = useState<View>('map');
   const [selectedSector, setSelectedSector] = useState<Sector | null>(null);
-  const [selectedModule, setSelectedModule] = useState<Module | null>(null);
-  const [trainingProblemIds, setTrainingProblemIds] = useState<string[] | null>(null);
+  const[selectedModule, setSelectedModule] = useState<Module | null>(null);
+  const[trainingProblemIds, setTrainingProblemIds] = useState<string[] | null>(null);
 
   // Глобальные флаги / модалки / гостевой режим
   const [isGuest, setIsGuest] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  const[showAuthModal, setShowAuthModal] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [showTournamentAdmin, setShowTournamentAdmin] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
-  const [showJoinCode, setShowJoinCode] = useState(false);
+  const[showJoinCode, setShowJoinCode] = useState(false);
   const [showCompanion, setShowCompanion] = useState(false);
   const [showCompanionSetup, setShowCompanionSetup] = useState(false);
   const [showLegal, setShowLegal] = useState<'privacy' | 'terms' | 'refund' | null>(null);
-  const [showAdminDashboard, setShowAdminDashboard] = useState(false);
+  const[showAdminDashboard, setShowAdminDashboard] = useState(false);
+  
+  // Флаг для дружеской дуэли (перемещен внутрь компонента)
+  const [showFriendlyDuel, setShowFriendlyDuel] = useState(false);
 
   // Игровые сессии
   const [activeGameSession, setActiveGameSession] = useState<{ duelId: string; tournamentId?: string } | null>(null);
-  const [activeTournamentId, setActiveTournamentId] = useState<string | null>(null);
+  const[activeTournamentId, setActiveTournamentId] = useState<string | null>(null);
 
   // === joinTournament (по коду) ===
   async function joinTournament(code: string) {
@@ -108,31 +114,36 @@ function MainApp() {
     }
   }
 
+  // === Хэндлер запуска дружеской дуэли ===
+  function handleFriendlyDuelReady(duelId: string) {
+    setShowFriendlyDuel(false);
+    setActiveGameSession({ duelId, tournamentId: undefined });
+    setView('pvp');
+  }
+
   // === Сохраняем код турнира ПЕРЕД логином/регистрацией ===
   useEffect(() => {
     const tCode = new URLSearchParams(window.location.search).get('t');
     if (tCode) {
       sessionStorage.setItem('pending_tournament_code', tCode);
     }
-  }, []);
+  },[]);
 
   // === Проверка активных сессий + подписка на duels ===
   useEffect(() => {
     if (!user) {
-      // если вышли - очистить состояния
       setActiveGameSession(null);
       setActiveTournamentId(null);
       return;
     }
 
-    // Если есть сохраненный код турнира или в URL, заходим в него после логина
     const urlCode = new URLSearchParams(window.location.search).get('t');
     const pendingCode = sessionStorage.getItem('pending_tournament_code');
     const codeToJoin = urlCode || pendingCode;
 
     if (codeToJoin) {
       joinTournament(codeToJoin);
-      sessionStorage.removeItem('pending_tournament_code'); // Очищаем после использования
+      sessionStorage.removeItem('pending_tournament_code');
     }
 
     let isMounted = true;
@@ -140,7 +151,6 @@ function MainApp() {
     async function checkActiveSession() {
       if (!user) return;
 
-      // 1. Проверка активных дуэлей
       const { data: duel } = await supabase
         .from('duels')
         .select('id, tournament_id, status, player1_id, player2_id')
@@ -156,7 +166,6 @@ function MainApp() {
         setActiveGameSession(null);
       }
 
-      // 2. Если дуэли нет — проверяем активные турниры, где пользователь участвует
       if (!duel) {
         const { data: part } = await supabase
           .from('tournament_participants')
@@ -176,7 +185,6 @@ function MainApp() {
 
     checkActiveSession();
 
-    // Подписка на изменения в таблице duels
     const channel = supabase
       .channel('global-game-check-' + (user?.id ?? 'anon'))
       .on(
@@ -216,9 +224,7 @@ function MainApp() {
       } catch (err) {
         try {
           supabase.removeChannel('global-game-check-' + user?.id);
-        } catch (e) {
-          // ignore
-        }
+        } catch (e) {}
       }
     };
   }, [user]);
@@ -263,7 +269,6 @@ function MainApp() {
     setShowOnboarding(false);
   }
 
-  // Навигационные хелперы
   function handleSectorSelect(sector: Sector) {
     setSelectedSector(sector);
     setView('modules');
@@ -289,12 +294,11 @@ function MainApp() {
       name: 'Работа над ошибками',
       theory_content: '',
       order_index: 0,
-      required_modules: []
+      required_modules:[]
     });
     setView('reactor');
   }
 
-  // Рендер загрузки
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center text-cyan-400">
@@ -303,7 +307,6 @@ function MainApp() {
     );
   }
 
-  // Лэндинг для гостя
   if (!user && !isGuest && !showAuthModal) {
     return (
       <>
@@ -317,7 +320,6 @@ function MainApp() {
     );
   }
 
-  // Окно авторизации
   if (!user && showAuthModal) {
     return (
       <div className="relative">
@@ -333,7 +335,6 @@ function MainApp() {
     );
   }
 
-  // === Основной рендер приложения ===
   return (
     <div className="min-h-screen bg-slate-900 relative selection:bg-cyan-500/30">
 
@@ -380,7 +381,7 @@ function MainApp() {
           />
         )}
 
-        {/* Кнопка возврата в турнир (для участника без активной дуэли) */}
+        {/* Кнопка возврата в турнир */}
         {activeTournamentId && !activeGameSession && view !== 'tournament_lobby' && (
           <div className="fixed top-4 left-0 right-0 z-[190] flex justify-center px-4 pointer-events-none">
             <div className="bg-slate-900/95 border-2 border-cyan-500/50 backdrop-blur-md rounded-2xl shadow-[0_0_25px_rgba(6,182,212,0.25)] p-3 flex items-center gap-3 max-w-sm w-full pointer-events-auto animate-in slide-in-from-top-full duration-500">
@@ -402,7 +403,6 @@ function MainApp() {
           </div>
         )}
 
-        {/* Header */}
         <Header
           user={user}
           profile={profile}
@@ -415,7 +415,6 @@ function MainApp() {
           onShowAuth={() => setShowAuthModal(true)}
         />
 
-        {/* Main content */}
         <main className="relative z-0 pb-24 md:pb-20 flex-1">
           <Suspense fallback={<PageLoader />}>
             {view === 'map' && (
@@ -441,6 +440,15 @@ function MainApp() {
                         <span className="font-bold text-amber-300 text-xs uppercase hidden sm:inline tracking-wider">
                           Ошибки
                         </span>
+                      </button>
+
+                      {/* НОВАЯ КНОПКА: ДРУЖЕСКИЙ МАТЧ */}
+                      <button
+                        onClick={() => setShowFriendlyDuel(true)}
+                        className="p-3 bg-slate-800/90 backdrop-blur-md border-2 border-emerald-600/50 hover:border-emerald-500 hover:bg-slate-800 rounded-2xl shadow-lg active:scale-95 transition-all group"
+                        title="Дружеский матч"
+                      >
+                        <Users className="w-5 h-5 text-emerald-400 group-hover:text-emerald-300 transition-colors" />
                       </button>
 
                       <button
@@ -503,7 +511,6 @@ function MainApp() {
         </main>
       </div>
 
-      {/* === ПРАВЫЙ ФЛОАТИНГ: КНОПКИ АДМИНА / УЧИТЕЛЯ === */}
       {(profile?.role === 'admin' || profile?.role === 'teacher') && (
         <div className="fixed bottom-28 right-4 z-50 flex flex-col gap-3">
           <button
@@ -562,8 +569,15 @@ function MainApp() {
           )}
 
           {showCompanion && <CompanionLair onClose={() => setShowCompanion(false)} />}
-
           {showAdminDashboard && <AdminDashboard onClose={() => setShowAdminDashboard(false)} />}
+
+          {/* НОВАЯ МОДАЛКА ДРУЖЕСКОЙ ДУЭЛИ */}
+          {showFriendlyDuel && (
+            <FriendlyDuelModal 
+              onClose={() => setShowFriendlyDuel(false)} 
+              onDuelReady={handleFriendlyDuelReady} 
+            />
+          )}
 
           <LevelUpManager />
         </Suspense>
@@ -581,7 +595,7 @@ function App() {
     const handlePopState = () => setPath(window.location.pathname);
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  },[]);
 
   return (
     <AuthProvider>
