@@ -181,13 +181,14 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
       });
 
       if (isCorrect) {
-        // --- ИЗМЕНЕНИЕ НАЧАЛО ---
-        // Мы больше не вызываем grantXp, так как это делает SQL-триггер.
-        // Просто рассчитываем визуальное значение для игрока:
+        // === ЛОГИКА ОТОБРАЖЕНИЯ ===
+        // База данных сама начислит:
+        // 1. +1 к счетчику задач игрока (XP)
+        // 2. +10 (или +20) к опыту суриката (SXP)
+        
         const isPremium = profile?.is_premium || false;
-        const visualXp = isPremium ? 20 : 10; // 10 база, 20 для премиум
-        setXpGained(visualXp);
-        // --- ИЗМЕНЕНИЕ КОНЕЦ ---
+        const sxpAmount = isPremium ? 20 : 10; // Это SXP суриката!
+        setXpGained(sxpAmount); 
 
         if (forcedProblemIds) {
            await supabase.from('user_errors')
@@ -196,8 +197,7 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
              .eq('problem_id', currentProblem.id);
         }
 
-        // Задержка перед обновлением профиля, чтобы триггер успел отработать в базе
-        setTimeout(() => refreshProfile(), 500); // Чуть увеличили задержку для надежности
+        setTimeout(() => refreshProfile(), 500);
         
         if (!forcedProblemIds) {
             const { data: progressData } = await supabase.from('user_progress').select('*').eq('user_id', user.id).eq('module_id', module.id).maybeSingle();
@@ -209,18 +209,7 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
               await supabase.from('user_progress').insert({ user_id: user.id, module_id: module.id, experiments_completed: 1, completion_percentage: 10 });
             }
         }
-      } else {
-        if (!forcedProblemIds) {
-            await supabase.from('user_errors').insert({
-              user_id: user.id,
-              problem_id: currentProblem.id,
-              module_id: module.id,
-              user_answer: userAnswer,
-              correct_answer: currentProblem.answer
-            });
-        }
       }
-    }
     setTimeout(() => { loadNextProblem(); }, 2000);
   }
 
@@ -362,16 +351,23 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
                   
                   {/* === НОВАЯ СИСТЕМА НАГРАД === */}
                   {result === 'correct' && (
-                     <div className="flex flex-col gap-1 mt-2 animate-in slide-in-from-bottom-2 fade-in duration-500">
-                        {/* Награда Игрока (XP) */}
-                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/10 border border-blue-500/30 rounded-lg text-blue-400 text-xs font-bold font-mono">
-                           <Zap className="w-3 h-3 fill-current" /> +10 XP
-                        </div>
+                     <div className="flex flex-col gap-2 mt-3 animate-in slide-in-from-bottom-2 fade-in duration-500">
                         
-                        {/* Награда Суриката (SXP) */}
+                        {/* Награда Игрока (XP) с подсветкой Premium */}
                         {xpGained && (
-                          <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-400 text-xs font-bold font-mono">
-                             <span className="text-lg leading-none">🐾</span> +{xpGained} SXP {profile?.is_premium ? '(x2)' : ''}
+                          <div className={`inline-flex items-center gap-2 px-3 py-1.5 border rounded-xl text-xs font-bold font-mono w-fit transition-all ${
+                            profile?.is_premium 
+                              ? 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-amber-500/50 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
+                              : 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                          }`}>
+                             <Zap className={`w-3.5 h-3.5 fill-current ${profile?.is_premium ? 'text-amber-400 animate-pulse' : ''}`} /> 
+                             +{xpGained} XP
+                             
+                             {profile?.is_premium && (
+                               <span className="ml-1 px-1.5 py-0.5 bg-amber-500 text-black text-[9px] rounded font-black uppercase tracking-wider">
+                                 PREMIUM x2
+                               </span>
+                             )}
                           </div>
                         )}
                      </div>
