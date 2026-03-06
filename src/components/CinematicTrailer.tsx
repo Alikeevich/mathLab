@@ -83,19 +83,19 @@ const MathRain = () => {
   ];
 
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-35 z-0">
+    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-25 z-0">
       {equations.map((eq, i) => (
         <motion.div
           key={i}
-          initial={{ y: -150, x: Math.random() * 100 + "vw", opacity: 0 }}
-          animate={{ y: "120vh", opacity: [0, 1, 0] }}
+          initial={{ y: -120, x: Math.random() * 100 + "vw", opacity: 0 }}
+          animate={{ y: "115vh", opacity: [0, 1, 0] }}
           transition={{
-            duration: 2.5 + Math.random() * 4.5,
+            duration: 3.8 + Math.random() * 5,
             repeat: Infinity,
-            delay: i * 0.15,
+            delay: i * 0.18,
             ease: "linear"
           }}
-          className="absolute text-cyan-300 font-bold text-2xl md:text-5xl drop-shadow-[0_0_12px_rgba(103,232,249,0.9)]"
+          className="absolute text-cyan-400 font-bold text-xl md:text-4xl drop-shadow-[0_0_8px_rgba(103,232,249,0.5)]"
         >
           <Latex>{`$${eq}$`}</Latex>
         </motion.div>
