@@ -83,7 +83,7 @@ const MathRain = () => {
   ];
 
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-25 z-0">
+    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30 z-0 sepia-[0.65]">
       {equations.map((eq, i) => (
         <motion.div
           key={i}
@@ -95,7 +95,7 @@ const MathRain = () => {
             delay: i * 0.18,
             ease: "linear"
           }}
-          className="absolute text-cyan-400 font-bold text-xl md:text-4xl drop-shadow-[0_0_8px_rgba(103,232,249,0.5)]"
+          className="absolute text-amber-300 font-bold text-xl md:text-4xl drop-shadow-[0_0_10px_rgba(245,158,11,0.4)]"
         >
           <Latex>{`$${eq}$`}</Latex>
         </motion.div>
