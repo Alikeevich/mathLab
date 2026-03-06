@@ -59,7 +59,7 @@ const GlobalTrailerStyles = () => (
 );
 
 const MathRain = () => {
-  const equations =[
+  const equations = [
     "\\int_{0}^{\\infty} e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}",
     "\\lim_{x \\to 0} \\frac{\\sin x}{x} = 1",
     "e^{i\\pi} + 1 = 0",
@@ -67,17 +67,35 @@ const MathRain = () => {
     "\\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}",
     "A = U \\Sigma V^T",
     "f'(x) = \\lim_{h \\to 0} \\frac{f(x+h) - f(x)}{h}",
-    "x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}"
+    "x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}",
+    "\\int e^x dx = e^x + C",
+    "\\frac{d}{dx} \\sin x = \\cos x",
+    "\\sin^2 x + \\cos^2 x = 1",
+    "e^{i\\theta} = \\cos \\theta + i \\sin \\theta",
+    "\\lim_{n \\to \\infty} (1 + 1/n)^n = e",
+    "\\Delta x \\Delta p \\geq \\frac{\\hbar}{2}",
+    "\\log_b a = \\frac{\\ln a}{\\ln b}",
+    "\\cos(2x) = 2\\cos^2 x - 1",
+    "\\int \\frac{1}{x} dx = \\ln |x| + C",
+    "\\sum_{k=1}^n k = \\frac{n(n+1)}{2}",
+    "\\mathbf{F} = m \\mathbf{a}",
+    "\\phi = \\frac{1 + \\sqrt{5}}{2}"
   ];
+
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20 z-0">
+    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-35 z-0">
       {equations.map((eq, i) => (
         <motion.div
           key={i}
-          initial={{ y: -100, x: Math.random() * 100 + "vw", opacity: 0 }}
-          animate={{ y: "110vh", opacity: [0, 1, 0] }}
-          transition={{ duration: 4 + Math.random() * 4, repeat: Infinity, delay: i * 0.8, ease: "linear" }}
-          className="absolute text-cyan-400 font-bold text-xl md:text-4xl"
+          initial={{ y: -150, x: Math.random() * 100 + "vw", opacity: 0 }}
+          animate={{ y: "120vh", opacity: [0, 1, 0] }}
+          transition={{
+            duration: 2.5 + Math.random() * 4.5,
+            repeat: Infinity,
+            delay: i * 0.15,
+            ease: "linear"
+          }}
+          className="absolute text-cyan-300 font-bold text-2xl md:text-5xl drop-shadow-[0_0_12px_rgba(103,232,249,0.9)]"
         >
           <Latex>{`$${eq}$`}</Latex>
         </motion.div>
@@ -204,6 +222,7 @@ export function CinematicTrailer({ onClose, onAction }: Props) {
   const mmrRounded = useTransform(mmrCount, Math.round);
   // СТЕЙТЫ ВЕРХНЕГО УРОВНЯ ДЛЯ ВНУТРЕННИХ АНИМАЦИЙ
   const [battlePhase, setBattlePhase] = useState(0);
+  const [matchTimer, setMatchTimer] = useState(3);
   const [pressedKey, setPressedKey] = useState<string|null>(null);
   const [levelUp, setLevelUp] = useState(false);
   const [mapCursor, setMapCursor] = useState({ x: '50vw', y: '80vh', clicking: false });
@@ -226,6 +245,8 @@ export function CinematicTrailer({ onClose, onAction }: Props) {
   // ВНУТРЕННИЕ АНИМАЦИИ В ЗАВИСИМОСТИ ОТ СЦЕНЫ
   useEffect(() => {
     let t1: any, t2: any, t3: any, t4: any, t5: any, t6: any;
+    let countdownInterval: any = null;
+  
     if (phase === 3) {
       t1 = setTimeout(() => setMapCursor({ x: '50vw', y: '50vh', clicking: false }), 500);
       t2 = setTimeout(() => setMapCursor({ x: '50vw', y: '50vh', clicking: true }), 1500);
@@ -235,6 +256,13 @@ export function CinematicTrailer({ onClose, onAction }: Props) {
       t2 = setTimeout(() => setLevelUp(true), 1700);
     }
     else if (phase === 6) {
+      setMatchTimer(3);
+      
+      // ←←← ТАЙМЕР СЧЁТА ВНИЗ (без пропусков)
+      countdownInterval = setInterval(() => {
+        setMatchTimer(prev => Math.max(prev - 1, 0));
+      }, 1000);
+  
       t1 = setTimeout(() => setBattlePhase(1), 1000);
       t2 = setTimeout(() => { setBattlePhase(2); setPressedKey('4'); }, 2500);
       t3 = setTimeout(() => setPressedKey(null), 2650);
@@ -245,8 +273,11 @@ export function CinematicTrailer({ onClose, onAction }: Props) {
     else if (phase === 7) {
       t1 = setTimeout(() => animate(mmrCount, 1400, { duration: 2.5, ease: "easeOut" }), 600);
     }
+  
     return () => {
-      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); clearTimeout(t5); clearTimeout(t6);
+      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
+      clearTimeout(t4); clearTimeout(t5); clearTimeout(t6);
+      if (countdownInterval) clearInterval(countdownInterval);
     };
   }, [phase, xpCount, mmrCount]);
 
@@ -434,9 +465,13 @@ export function CinematicTrailer({ onClose, onAction }: Props) {
                   <span className="text-cyan-400 font-bold uppercase tracking-widest text-[10px]">YOU</span>
                   <span className="text-3xl font-black text-white">{battlePhase >= 5 ? 15 : 14}</span>
                 </div>
-                <motion.div animate={battlePhase >= 1 && battlePhase < 5 ? { color:["#fff", "#ef4444", "#fff"], scale:[1, 1.1, 1] } : {}} transition={{ repeat: Infinity, duration: 0.4 }} className="text-2xl font-mono font-black text-white flex items-center gap-1">
-                  <Timer className="w-5 h-5" /> 00:0{battlePhase >= 5 ? '0' : (battlePhase >= 2 ? '1' : '3')}
-                </motion.div>
+                  <motion.div 
+                    animate={battlePhase >= 1 && battlePhase < 5 ? { color:["#fff", "#ef4444", "#fff"], scale:[1, 1.1, 1] } : {}} 
+                    transition={{ repeat: Infinity, duration: 0.4 }} 
+                    className="text-2xl font-mono font-black text-white flex items-center gap-1"
+                  >
+                    <Timer className="w-5 h-5" /> 00:0{matchTimer}
+                  </motion.div>
                 <div className="flex flex-col text-right">
                   <span className="text-red-500 font-bold uppercase tracking-widest text-[10px]">BOSS</span>
                   <span className="text-3xl font-black text-white">{battlePhase >= 1 ? 14 : 13}</span>
