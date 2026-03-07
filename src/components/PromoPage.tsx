@@ -8,12 +8,10 @@ export function PromoPage() {
 
   // Если выбран главный трейлер — рендерим его на весь экран
   if (playing === 'cinematic') {
-    return (
-      <CinematicTrailer 
-        onClose={() => setPlaying(null)} 
-        onAction={() => window.location.href = '/'} 
-      />
-    );
+    return <CinematicTrailer onClose={() => setPlaying(null)} onAction={() => window.location.href = '/'} />;
+  }
+  if (playing === 'war') {
+    return <WarTrailer onClose={() => setPlaying(null)} onAction={() => window.location.href = '/'} />;
   }
 
   // Массив доступных роликов (можешь добавлять сюда новые)
@@ -24,6 +22,7 @@ export function PromoPage() {
       description: 'Эпичный кинематографичный тизер платформы. История от скуки до Алмазного ранга.',
       duration: '0:29',
       icon: Film,
+      disabled: false,
       style: {
         glow: 'from-cyan-500/40 to-blue-600/40',
         iconBg: 'bg-cyan-500/20 border-cyan-500/40',
