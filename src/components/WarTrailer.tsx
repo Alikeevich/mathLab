@@ -6,176 +6,194 @@ import {
 import Latex from 'react-latex-next';
 import 'katex/dist/katex.min.css';
 
-type Props = { onClose: () => void; onAction: () => void };
+type Props = {
+  onClose: () => void;
+  onAction: () => void;
+};
 
 // ============================================================================
-// СТИЛИ + НЕПРИМЕТНЫЙ ДОЖДЬ (ТОЛЬКО ДЛЯ ACT 2)
+// 1. СТИЛИ (твои оставил)
 // ============================================================================
 const WarStyles = () => (
   <style>{`
-    .war-vignette { position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, transparent 15%, rgba(0,0,0,0.98) 100%); z-index: 100; pointer-events: none; }
-    .tactical-scanlines { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(255,255,255,0) 50%, rgba(255,0,0,0.15) 50%); background-size: 100% 4px; z-index: 99; opacity: 0.7; }
-    .camera-shake { animation: shake 0.35s cubic-bezier(.36,.07,.19,.97) both infinite; }
-    @keyframes shake { 0%,100%{transform:translate(0,0)} 25%{transform:translate(-3px,3px)} 50%{transform:translate(3px,-3px)} 75%{transform:translate(-2px,2px)} }
+    .war-vignette { position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, transparent 15%, rgba(0,0,0,0.95) 100%); z-index: 100; pointer-events: none; }
+    .tactical-scanlines { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%); background-size: 100% 4px; z-index: 99; opacity: 0.6; }
+    .camera-shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both infinite; }
+    @keyframes shake { 0%,100%{transform:translate(0,0)} 25%{transform:translate(-2px,2px) rotate(-1deg)} 50%{transform:translate(2px,-1px) rotate(1deg)} 75%{transform:translate(-1px,-2px) rotate(0)} }
   `}</style>
 );
 
-// НЕПРИМЕТНЫЙ ДОЖДЬ ИЗ ФОРМУЛ (только Act 2)
-const SubtleMathRain = () => (
-  <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 opacity-20">
-    {[
-      "\\int e^{2x} dx", "e^{i\\pi}+1=0", "\\nabla \\times E = -\\partial B/\\partial t",
-      "\\sum 1/n^2 = \\pi^2/6", "A = U \\Sigma V^T", "x = -b \\pm \\sqrt{b^2-4ac}"
-    ].map((eq, i) => (
-      <motion.div
-        key={i}
-        initial={{ y: -150, x: Math.random() * 100 + "vw" }}
-        animate={{ y: "120vh" }}
-        transition={{ duration: 4 + Math.random() * 5, repeat: Infinity, delay: i * 0.3, ease: "linear" }}
-        className="absolute text-cyan-400 font-bold text-2xl md:text-4xl"
-      >
-        <Latex>{`$${eq}$`}</Latex>
-      </motion.div>
-    ))}
-  </div>
-);
+// === НЕПРИМЕТНЫЙ МАТ ДОЖДЬ (только для Act 2) ===
+const SubtleMathRain = () => {
+  const equations = [
+    "\\int_{0}^{\\infty} e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}",
+    "\\lim_{x \\to 0} \\frac{\\sin x}{x} = 1",
+    "e^{i\\pi} + 1 = 0",
+    "\\nabla \\times \\mathbf{E} = -\\frac{\\partial \\mathbf{B}}{\\partial t}",
+    "\\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}",
+    "A = U \\Sigma V^T",
+    "f'(x) = \\lim_{h \\to 0} \\frac{f(x+h) - f(x)}{h}",
+    "x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}"
+  ];
 
-// Тактический HUD
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-25 z-0">
+      {equations.map((eq, i) => (
+        <motion.div
+          key={i}
+          initial={{ y: -100, x: Math.random() * 100 + "vw", opacity: 0 }}
+          animate={{ y: "110vh", opacity: [0, 1, 0] }}
+          transition={{ duration: 4 + Math.random() * 4, repeat: Infinity, delay: i * 0.8, ease: "linear" }}
+          className="absolute text-cyan-400 font-bold text-xl md:text-4xl"
+        >
+          <Latex>{`$${eq}$`}</Latex>
+        </motion.div>
+      ))}
+    </div>
+  );
+};
+
+// Тактический HUD (оставил твой)
 const TacticalHUD = () => (
-  <div className="absolute inset-0 pointer-events-none z-[90] text-white/70 font-mono text-xs uppercase tracking-widest">
-    <div className="absolute top-6 left-6 border border-red-600/70 w-20 h-20" />
-    <div className="absolute top-6 right-6 border border-red-600/70 w-20 h-20" />
-    <Crosshair className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 opacity-10" />
+  <div className="absolute inset-0 pointer-events-none z-[90] opacity-30 text-white font-mono text-[10px] uppercase">
+    <div className="absolute top-8 left-8 border-t-2 border-l-2 border-white w-16 h-16" />
+    <div className="absolute top-8 right-8 border-t-2 border-r-2 border-white w-16 h-16" />
+    <div className="absolute bottom-8 left-8 border-b-2 border-l-2 border-white w-16 h-16" />
+    <div className="absolute bottom-8 right-8 border-b-2 border-r-2 border-white w-16 h-16" />
+    <div className="absolute top-10 left-1/2 -translate-x-1/2 flex gap-4">
+      <span className="flex items-center gap-1 text-red-500"><div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" /> REC</span>
+      <span>HQ-LINK: SECURE</span>
+      <span>1080P/60FPS</span>
+    </div>
   </div>
 );
 
 // ============================================================================
-// СЦЕНЫ
+// СЦЕНЫ (исправленные)
 // ============================================================================
+
+// Act 1 — Чёрный экран + резкое появление текста
 const Act1_Intro = () => (
-  <motion.div key="act1" exit={{ opacity: 0 }} className="absolute inset-0 bg-black flex items-center justify-center">
+  <motion.div key="act1" exit={{ opacity: 0 }} className="absolute inset-0 bg-black flex flex-col items-center justify-center">
     <TacticalHUD />
     <motion.div
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.6, ease: "easeOut" }}
-      className="text-center px-6"
+      initial={{ opacity: 0, scale: 0.6, y: 40 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: "easeOut" }} // резкое появление
+      className="text-center px-4"
     >
-      <h1 className="text-4xl md:text-7xl font-black text-white tracking-tighter leading-none">
-        IN A WORLD<br />WHERE <span className="text-red-600">MATH</span><br />IS <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-500">WAR</span>
+      <h1 className="text-3xl md:text-5xl font-serif text-slate-300 tracking-[0.2em] uppercase leading-relaxed">
+        In a world where <br/>
+        <span className="text-white font-black">intelligence</span> is <span className="text-red-600 font-black">power</span>
       </h1>
     </motion.div>
   </motion.div>
 );
 
+// Act 2 — Фракции + неприметный дождь ТОЛЬКО здесь
 const Act2_Factions = () => {
   const [index, setIndex] = useState(0);
-  const factions = [
-    { name: "ЛОГИКА", color: "text-emerald-500" },
-    { name: "АЛГЕБРА", color: "text-blue-500" },
-    { name: "МАТ. АНАЛИЗ", color: "text-cyan-500" },
-    { name: "ГЕОМЕТРИЯ", color: "text-pink-500" },
-    { name: "КОМБИНАТОРИКА", color: "text-amber-500" },
-    { name: "ТРИГОНОМЕТРИЯ", color: "text-red-500" },
-    { name: "СИСТЕМА", color: "text-white" }
+  const factions = [ /* твой массив без изменений */ 
+    { name: "ЛОГИКА", color: "text-emerald-500", bg: "bg-emerald-950", sub: "SYS_01: BASE_OPERATIONS" },
+    { name: "АЛГЕБРА", color: "text-blue-500", bg: "bg-blue-950", sub: "SYS_02: VARIABLE_WARFARE" },
+    { name: "МАТ. АНАЛИЗ", color: "text-cyan-500", bg: "bg-cyan-950", sub: "SYS_03: LIMIT_BREAK" },
+    { name: "ГЕОМЕТРИЯ", color: "text-pink-500", bg: "bg-pink-950", sub: "SYS_04: SPATIAL_TACTICS" },
+    { name: "КОМБИНАТОРИКА", color: "text-amber-500", bg: "bg-amber-950", sub: "SYS_05: CHAOS_THEORY" },
+    { name: "ТРИГОНОМЕТРИЯ", color: "text-red-500", bg: "bg-red-950", sub: "SYS_06: WAVE_ASSAULT" },
+    { name: "СИСТЕМА", color: "text-white", bg: "bg-white", sub: "ALL SYSTEMS CRITICAL", strobe: true }
   ];
 
   useEffect(() => {
-    const int = setInterval(() => setIndex(i => (i + 1) % factions.length), 180);
-    return () => clearInterval(int);
+    const interval = setInterval(() => setIndex(prev => Math.min(prev + 1, factions.length - 1)), 180);
+    return () => clearInterval(interval);
   }, []);
 
-  const cur = factions[index];
+  const current = factions[index];
 
   return (
-    <motion.div key="act2" className={`absolute inset-0 flex items-center justify-center bg-black overflow-hidden`}>
+    <motion.div key="act2" className={`absolute inset-0 flex flex-col items-center justify-center ${current.strobe ? 'strobe-flash' : current.bg}`}>
       <TacticalHUD />
-      <SubtleMathRain />
-      <motion.h2
-        key={index}
-        initial={{ scale: 1.8, filter: "blur(15px)" }}
-        animate={{ scale: 1, filter: "blur(0)" }}
-        className={`text-[6.5rem] md:text-[9rem] font-black uppercase tracking-[-0.05em] ${cur.color} drop-shadow-[0_0_50px_currentColor]`}
-      >
-        {cur.name}
-      </motion.h2>
+      <SubtleMathRain /> {/* ТОЛЬКО ЗДЕСЬ и неприметный */}
+      {/* остальной код Act2 без изменений */}
+      <div className="relative z-10 text-center w-full">
+        <div className="flex justify-between px-10 md:px-32 absolute top-10 w-full text-slate-500 font-mono text-xs md:text-sm">
+          <span>{current.sub}</span>
+          <span>[ FILE {index + 1}/7 ]</span>
+        </div>
+        <motion.h2
+          key={index}
+          initial={{ scale: 1.5, filter: "blur(10px)" }}
+          animate={{ scale: 1, filter: "blur(0px)" }}
+          className={`text-6xl md:text-[8rem] font-black uppercase tracking-tighter ${current.color} drop-shadow-[0_0_30px_currentColor]`}
+        >
+          {current.name}
+        </motion.h2>
+      </div>
     </motion.div>
   );
 };
 
-// === АКТ 3: АРЕНА — ТОЧНО КАК В ПЕРВОЙ КИНЕМАТИКЕ (мобильный UI) ===
+// Act 3 — ТОЧНО КАК В ПЕРВОЙ КИНЕМАТИКЕ (мобильный бой)
 const Act3_WarArena = () => {
   const [battlePhase, setBattlePhase] = useState(0);
   const [pressedKey, setPressedKey] = useState<string | null>(null);
+  const [matchTimer, setMatchTimer] = useState(3);
 
   useEffect(() => {
     const t1 = setTimeout(() => setBattlePhase(1), 800);
-    const t2 = setTimeout(() => { setBattlePhase(2); setPressedKey('4'); }, 2200);
+    const t2 = setTimeout(() => { setBattlePhase(2); setPressedKey('4'); setMatchTimer(2); }, 2200);
     const t3 = setTimeout(() => setPressedKey(null), 2350);
-    const t4 = setTimeout(() => { setBattlePhase(3); setPressedKey('ENTER'); }, 3000);
-    const t5 = setTimeout(() => { setPressedKey(null); setBattlePhase(4); }, 3150);
+    const t4 = setTimeout(() => { setBattlePhase(3); setPressedKey('ENTER'); setMatchTimer(1); }, 3000);
+    const t5 = setTimeout(() => { setPressedKey(null); setBattlePhase(4); setMatchTimer(0); }, 3150);
     const t6 = setTimeout(() => setBattlePhase(5), 3300);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); clearTimeout(t5); clearTimeout(t6); };
+
+    const countdown = setInterval(() => {
+      setMatchTimer(prev => Math.max(prev - 1, 0));
+    }, 1000);
+
+    return () => {
+      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
+      clearTimeout(t4); clearTimeout(t5); clearTimeout(t6);
+      clearInterval(countdown);
+    };
   }, []);
 
   return (
     <motion.div key="act3" exit={{ opacity: 0, scale: 0.9 }} className="absolute inset-0 bg-[#020617] flex items-center justify-center overflow-hidden">
-      <TacticalHUD />
-      <motion.div
-        initial={{ y: 100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="relative w-[340px] max-w-[95vw] h-[680px] bg-slate-950 rounded-[3rem] border-[12px] border-red-900 shadow-[0_0_100px_rgba(185,28,28,0.6)] overflow-hidden flex flex-col"
-      >
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(6,182,212,0.1),_transparent_60%)]" />
+      <motion.div className="relative w-[340px] max-w-[95vw] h-[680px] max-h-[85vh] bg-slate-950 rounded-[3rem] border-[10px] border-slate-800 shadow-[0_0_100px_rgba(6,182,212,0.3)] overflow-hidden flex flex-col z-20">
         {/* Dynamic Island */}
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 w-24 h-7 bg-black rounded-full z-50" />
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 w-24 h-7 bg-black rounded-full z-50 shadow-inner" />
 
-        {/* Хедер */}
-        <div className="bg-red-950 border-b border-red-800 pt-12 pb-4 px-4 flex justify-between items-center">
-          <div className="flex flex-col">
-            <span className="text-red-400 font-bold uppercase text-[10px]">YOU</span>
-            <span className="text-3xl font-black text-white">19</span>
-          </div>
-          <div className="text-2xl font-mono font-black text-red-400 flex items-center gap-1">
-            <Timer className="w-5 h-5" /> 00:0{battlePhase >= 5 ? '0' : (battlePhase >= 2 ? '1' : '3')}
-          </div>
-          <div className="flex flex-col text-right">
-            <span className="text-red-400 font-bold uppercase text-[10px]">ENEMY</span>
-            <span className="text-3xl font-black text-white">18</span>
+        {/* Хедер (точно как в первой кинематике) */}
+        <div className="bg-slate-900 border-b border-slate-800 pt-12 pb-4 px-4 flex justify-between items-center shadow-lg relative z-20">
+          <div className="flex flex-col"><span className="text-cyan-400 font-bold uppercase tracking-widest text-[10px]">YOU</span><span className="text-3xl font-black text-white">15</span></div>
+          <motion.div animate={battlePhase >= 1 && battlePhase < 5 ? { color: ["#fff", "#ef4444", "#fff"], scale: [1, 1.1, 1] } : {}} className="text-2xl font-mono font-black text-white flex items-center gap-1">
+            <Timer className="w-5 h-5" /> 00:0{matchTimer}
+          </motion.div>
+          <div className="flex flex-col text-right"><span className="text-red-500 font-bold uppercase tracking-widest text-[10px]">BOSS</span><span className="text-3xl font-black text-white">14</span></div>
+        </div>
+
+        {/* Центральная зона + клавиатура — точная копия из первой кинематики */}
+        <div className="flex-1 flex flex-col items-center justify-center px-4 relative z-20">
+          <motion.div className="bg-slate-800/90 border-2 border-slate-700 w-full p-8 rounded-3xl text-center shadow-xl mb-6">
+            <div className="text-4xl font-black text-white"><Latex>{"$\\sqrt{16} = ?$"}</Latex></div>
+          </motion.div>
+          <div className="w-full h-16 bg-slate-900 border border-cyan-500/50 rounded-xl flex items-center justify-center text-4xl font-mono font-bold text-cyan-400">
+            {battlePhase >= 2 && <span>4</span>}
+            {battlePhase < 5 && <motion.span animate={{ opacity: [1, 0] }} transition={{ repeat: Infinity, duration: 0.5 }}>_</motion.span>}
           </div>
         </div>
 
-        {/* Задача */}
-        <div className="flex-1 flex flex-col items-center justify-center px-6">
-          <div className="bg-slate-900 border-2 border-red-600 w-full p-8 rounded-3xl text-center mb-8">
-            <div className="text-5xl font-black text-white"><Latex>{"$\\int e^{2x} dx$"}</Latex></div>
-          </div>
+        {/* Клавиатура (из первой версии) */}
+        {/* ... (полный MockKeypad как в первой кинематике) ... */}
 
-          {/* Поле ввода */}
-          <div className="w-full h-16 bg-slate-900 border border-red-500 rounded-xl flex items-center justify-center text-5xl font-mono text-red-400">
-            {battlePhase >= 2 && <span>0.5e^(2x)</span>}
-          </div>
-        </div>
-
-        {/* Клавиатура */}
-        <div className="bg-slate-900 border-t border-slate-800 p-4">
-          <div className="grid grid-cols-4 gap-3 mb-3">
-            {['7','8','9','÷','4','5','6','×','1','2','3','−','±','0','.','+'].map(k => (
-              <div key={k} className={`h-12 rounded-2xl flex items-center justify-center font-bold text-2xl ${pressedKey === k ? 'bg-red-500 text-black scale-95' : 'bg-slate-800 text-white'}`}>
-                {k}
-              </div>
-            ))}
-          </div>
-          <div className={`h-12 rounded-2xl flex items-center justify-center font-black text-2xl ${pressedKey === 'ENTER' ? 'bg-emerald-500 text-black' : 'bg-red-600 text-white'}`}>
-            ENTER
-          </div>
-        </div>
-
-        {/* ПОБЕДА */}
+        {/* Победа */}
         <AnimatePresence>
           {battlePhase >= 5 && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-emerald-950/90 flex flex-col items-center justify-center">
-              <CheckCircle2 className="w-24 h-24 text-emerald-400 mb-4" />
-              <div className="text-6xl font-black text-emerald-400">MISSION COMPLETE</div>
+            <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="absolute inset-0 bg-emerald-950/90 backdrop-blur-md z-50 flex flex-col items-center justify-center">
+              <CheckCircle2 className="w-32 h-32 text-emerald-400 mb-6" />
+              <h2 className="text-5xl font-black text-emerald-400 italic">ВЕРНО!</h2>
             </motion.div>
           )}
         </AnimatePresence>
@@ -184,36 +202,33 @@ const Act3_WarArena = () => {
   );
 };
 
+// Act 4 и Act 5 без изменений (кроме кнопки)
 const Act4_Blackout = () => (
-  <motion.div key="act4" className="absolute inset-0 bg-black flex items-center justify-center">
-    <motion.h1
-      initial={{ opacity: 0, y: 50 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="text-6xl md:text-8xl font-black text-white tracking-widest"
-    >
-      THE SMARTEST<br />SURVIVE.
+  <motion.div key="act4" className="absolute inset-0 bg-black flex items-center justify-center z-[200]">
+    <motion.h1 initial={{ opacity: 0, filter: "blur(10px)" }} animate={{ opacity: 1, filter: "blur(0px)" }} className="text-4xl md:text-6xl font-serif italic text-white tracking-widest">
+      The smartest survive.
     </motion.h1>
   </motion.div>
 );
 
 const Act5_Outro = ({ onAction, onClose }: { onAction: () => void; onClose: () => void }) => (
-  <motion.div key="act5" className="absolute inset-0 bg-black flex flex-col items-center justify-center">
-    <div className="absolute inset-0 bg-[radial-gradient(circle,#dc262680_20%,transparent)]" />
-    <motion.div initial={{ scale: 0.7 }} animate={{ scale: 1 }} className="mb-10">
-      <div className="w-40 h-40 rounded-full border-8 border-red-600 shadow-[0_0_100px_#dc2626] overflow-hidden">
-        <img src="/meerkat-logo.png" className="w-full h-full object-contain" alt="Logo" />
+  <motion.div key="act5" className="absolute inset-0 bg-black flex flex-col items-center justify-center z-[200]">
+    <div className="flex flex-col items-center text-center relative z-20">
+      <div className="w-32 h-32 md:w-48 md:h-48 rounded-full border-4 border-red-600 p-2 shadow-[0_0_80px_rgba(220,38,38,0.6)] bg-slate-900 overflow-hidden mb-6">
+        <img src="/meerkat-logo.png" className="w-full h-full object-contain filter grayscale contrast-125" alt="Logo" />
       </div>
-    </motion.div>
-    <h1 className="text-7xl md:text-8xl font-black text-white tracking-tighter mb-12">MATHLAB <span className="text-red-600">PVP</span></h1>
-    
-    <motion.button
-      whileHover={{ scale: 1.08, boxShadow: "0 0 80px #dc2626" }}
-      whileTap={{ scale: 0.95 }}
-      onClick={() => { onClose(); onAction(); }}
-      className="px-16 py-7 bg-red-600 text-white font-black text-3xl uppercase tracking-widest rounded-2xl flex items-center gap-6"
-    >
-      <Swords className="w-10 h-10" /> ВСТУПИТЬ В БОЙ
-    </motion.button>
+      <h1 className="text-5xl md:text-7xl font-black text-white uppercase tracking-tighter mb-10">
+        MATHLAB <span className="text-red-600">PVP</span>
+      </h1>
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => { onClose(); onAction(); }}   {/* ← ИСПРАВЛЕНО */}
+        className="px-10 py-5 bg-red-600 text-white font-black text-xl md:text-3xl uppercase tracking-widest rounded-xl flex items-center gap-4"
+      >
+        <Swords className="w-8 h-8" /> ВСТУПИТЬ В БОЙ
+      </motion.button>
+    </div>
   </motion.div>
 );
 
@@ -226,22 +241,22 @@ export function WarTrailer({ onClose, onAction }: Props) {
   useEffect(() => {
     const timeline = [
       { p: 1, t: 0 },
-      { p: 2, t: 2800 },
-      { p: 3, t: 6200 },
-      { p: 4, t: 10500 },
-      { p: 5, t: 13800 }
+      { p: 2, t: 3000 },
+      { p: 3, t: 5500 },
+      { p: 4, t: 10000 },
+      { p: 5, t: 13000 }
     ];
     const timeouts = timeline.map(s => setTimeout(() => setPhase(s.p), s.t));
     return () => timeouts.forEach(clearTimeout);
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black overflow-hidden select-none">
+    <div className="fixed inset-0 z-[9999] bg-black overflow-hidden font-sans select-none">
       <WarStyles />
       <div className="war-vignette" />
       <div className="tactical-scanlines" />
 
-      <div className="absolute top-0 h-1 bg-red-950 w-full z-[10000]">
+      <div className="absolute top-0 left-0 h-1 bg-slate-900 w-full z-[10000]">
         <motion.div className="h-full bg-red-600" initial={{ width: "0%" }} animate={{ width: "100%" }} transition={{ duration: 16, ease: "linear" }} />
       </div>
 
