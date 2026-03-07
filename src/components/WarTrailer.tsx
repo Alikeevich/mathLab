@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Swords, Timer, CheckCircle2, Crosshair
+  Swords, Timer, CheckCircle2
 } from 'lucide-react';
 import Latex from 'react-latex-next';
 import 'katex/dist/katex.min.css';
@@ -20,6 +20,8 @@ const WarStyles = () => (
     .tactical-scanlines { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%); background-size: 100% 4px; z-index: 99; opacity: 0.6; }
     .camera-shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both infinite; }
     @keyframes shake { 0%,100%{transform:translate(0,0)} 25%{transform:translate(-2px,2px) rotate(-1deg)} 50%{transform:translate(2px,-1px) rotate(1deg)} 75%{transform:translate(-1px,-2px) rotate(0)} }
+    .strobe-flash { animation: strobe 0.06s steps(1) infinite; }
+    @keyframes strobe { 0% { opacity: 1 } 50% { opacity: 0.2 } 100% { opacity: 1 } }
   `}</style>
 );
 
@@ -37,14 +39,15 @@ const SubtleMathRain = () => {
   ];
 
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-25 z-0">
+    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-18 z-0">
       {equations.map((eq, i) => (
         <motion.div
           key={i}
           initial={{ y: -100, x: Math.random() * 100 + "vw", opacity: 0 }}
           animate={{ y: "110vh", opacity: [0, 1, 0] }}
-          transition={{ duration: 4 + Math.random() * 4, repeat: Infinity, delay: i * 0.8, ease: "linear" }}
+          transition={{ duration: 3 + Math.random() * 3, repeat: Infinity, delay: i * 0.6, ease: "linear" }}
           className="absolute text-cyan-400 font-bold text-xl md:text-4xl"
+          style={{ left: `${Math.random() * 80}vw` }}
         >
           <Latex>{`$${eq}$`}</Latex>
         </motion.div>
@@ -106,55 +109,105 @@ const MockKeypad = ({ pressedKey }: { pressedKey: string | null }) => {
 // СЦЕНЫ
 // ============================================================================
 
-const Act1_Intro = () => (
-  <motion.div key="act1" exit={{ opacity: 0 }} className="absolute inset-0 bg-black flex flex-col items-center justify-center">
-    <TacticalHUD />
-    <motion.div
-      initial={{ opacity: 0, scale: 0.6, y: 40 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      className="text-center px-4"
-    >
-      <h1 className="text-3xl md:text-5xl font-serif text-slate-300 tracking-[0.2em] uppercase leading-relaxed">
-        In a world where <br/>
-        <span className="text-white font-black">intelligence</span> is <span className="text-red-600 font-black">power</span>
-      </h1>
-    </motion.div>
-  </motion.div>
-);
+// Act1_Intro теперь раскрывает сначала "In a world" затем отдельной линией "where intelligence is a power"
+const Act1_Intro = ({ onComplete }: { onComplete: () => void }) => {
+  useEffect(() => {
+    // авто-завершение: покажем первую фразу, затем вторую, затем резкий blackout и сигнализируем completion
+    const t1 = setTimeout(() => {/* first line fully visible */}, 900);
+    const t2 = setTimeout(() => {/* second line */}, 1700);
+    const t3 = setTimeout(() => {
+      // быстрый blackout — небольшой fade
+      onComplete();
+    }, 2600);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, [onComplete]);
 
+  return (
+    <motion.div key="act1" exit={{ opacity: 0 }} className="absolute inset-0 bg-black flex flex-col items-center justify-center">
+      <TacticalHUD />
+      <div className="text-center px-4">
+        <motion.h1
+          initial={{ opacity: 0, filter: 'blur(12px)', scale: 0.96 }}
+          animate={{ opacity: 1, filter: 'blur(0px)', scale: 1 }}
+          transition={{ duration: 0.9, ease: 'easeOut' }}
+          className="text-4xl md:text-6xl font-serif text-white tracking-[0.2em] uppercase leading-relaxed"
+        >
+          In a world
+        </motion.h1>
+
+        <motion.h2
+          initial={{ opacity: 0, y: 12, filter: 'blur(8px)' }}
+          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+          transition={{ delay: 1.0, duration: 0.6, ease: 'easeOut' }}
+          className="text-xl md:text-2xl font-serif text-slate-300 mt-6"
+        >
+          where <span className="text-white font-black">intelligence</span> is <span className="text-red-600 font-black">power</span>
+        </motion.h2>
+      </div>
+    </motion.div>
+  );
+};
+
+// Act2_Factions: больше фракций, быстрее перелистывание и ускорение по мере прогресса
 const Act2_Factions = () => {
   const [index, setIndex] = useState(0);
+
   const factions = [
-    { name: "ЛОГИКА", color: "text-emerald-500", bg: "bg-emerald-950", sub: "SYS_01: BASE_OPERATIONS" },
-    { name: "АЛГЕБРА", color: "text-blue-500", bg: "bg-blue-950", sub: "SYS_02: VARIABLE_WARFARE" },
-    { name: "МАТ. АНАЛИЗ", color: "text-cyan-500", bg: "bg-cyan-950", sub: "SYS_03: LIMIT_BREAK" },
-    { name: "ГЕОМЕТРИЯ", color: "text-pink-500", bg: "bg-pink-950", sub: "SYS_04: SPATIAL_TACTICS" },
-    { name: "КОМБИНАТОРИКА", color: "text-amber-500", bg: "bg-amber-950", sub: "SYS_05: CHAOS_THEORY" },
-    { name: "ТРИГОНОМЕТРИЯ", color: "text-red-500", bg: "bg-red-950", sub: "SYS_06: WAVE_ASSAULT" },
+    { name: "ЛОГИКА", color: "text-emerald-400", bg: "bg-emerald-950", sub: "SYS_01: BASE_OPERATIONS" },
+    { name: "АЛГЕБРА", color: "text-blue-400", bg: "bg-blue-950", sub: "SYS_02: VARIABLE_WARFARE" },
+    { name: "МАТ. АНАЛИЗ", color: "text-cyan-400", bg: "bg-cyan-950", sub: "SYS_03: LIMIT_BREAK" },
+    { name: "ГЕОМЕТРИЯ", color: "text-pink-400", bg: "bg-pink-950", sub: "SYS_04: SPATIAL_TACTICS" },
+    { name: "КОМБИНАТОРИКА", color: "text-amber-400", bg: "bg-amber-950", sub: "SYS_05: CHAOS_THEORY" },
+    { name: "ТРИГОНОМЕТРИЯ", color: "text-red-400", bg: "bg-red-950", sub: "SYS_06: WAVE_ASSAULT" },
+    { name: "СТАТИСТИКА", color: "text-violet-400", bg: "bg-violet-950", sub: "SYS_07: PROB_STRIKE" },
+    { name: "КОМПЬЮТЕРКА", color: "text-sky-400", bg: "bg-sky-950", sub: "SYS_08: ALGO_ASSAULT" },
+    { name: "КРИПТОГРАФИЯ", color: "text-lime-400", bg: "bg-lime-950", sub: "SYS_09: CIPHER_WAR" },
+    { name: "ДИФФУРЫ", color: "text-amber-300", bg: "bg-amber-900", sub: "SYS_10: FLOW_CONTROL" },
+    { name: "ТОПОГРАФИЯ", color: "text-rose-300", bg: "bg-rose-900", sub: "SYS_11: MAP_DOMINION" },
     { name: "СИСТЕМА", color: "text-white", bg: "bg-white", sub: "ALL SYSTEMS CRITICAL", strobe: true }
   ];
 
+  // начальная задержка (ms) — уменьшится с каждой карточки
+  const startDelay = 160;
+
   useEffect(() => {
-    const interval = setInterval(() => setIndex(prev => Math.min(prev + 1, factions.length - 1)), 180);
-    return () => clearInterval(interval);
+    let cancelled = false;
+
+    const tick = (i: number) => {
+      if (cancelled) return;
+      if (i >= factions.length - 1) return setIndex(factions.length - 1);
+
+      // ускорение: чем больше i — тем меньше задержка
+      const delay = Math.max(40, Math.round(startDelay - i * 10));
+
+      setTimeout(() => {
+        setIndex(prev => Math.min(prev + 1, factions.length - 1));
+        tick(i + 1);
+      }, delay);
+    };
+
+    tick(0);
+    return () => { cancelled = true; };
   }, []);
 
   const current = factions[index];
+  const delayForAnim = Math.max(0.06, Math.min(0.25, (Math.max(40, 160 - index * 10) / 1000) * 0.9));
 
   return (
     <motion.div key="act2" className={`absolute inset-0 flex flex-col items-center justify-center ${current.strobe ? 'strobe-flash' : current.bg}`}>
       <TacticalHUD />
       <SubtleMathRain />
-      <div className="relative z-10 text-center w-full">
-        <div className="flex justify-between px-10 md:px-32 absolute top-10 w-full text-slate-500 font-mono text-xs md:text-sm">
+      <div className="relative z-10 text-center w-full px-4">
+        <div className="flex justify-between px-6 md:px-32 absolute top-10 w-full text-slate-500 font-mono text-xs md:text-sm">
           <span>{current.sub}</span>
-          <span>[ FILE {index + 1}/7 ]</span>
+          <span>[ FILE {index + 1}/{factions.length} ]</span>
         </div>
+
         <motion.h2
           key={index}
-          initial={{ scale: 1.5, filter: "blur(10px)" }}
-          animate={{ scale: 1, filter: "blur(0px)" }}
+          initial={{ scale: 1.6, filter: 'blur(10px)', opacity: 0 }}
+          animate={{ scale: 1, filter: 'blur(0px)', opacity: 1 }}
+          transition={{ duration: delayForAnim, ease: 'linear' }}
           className={`text-6xl md:text-[8rem] font-black uppercase tracking-tighter ${current.color} drop-shadow-[0_0_30px_currentColor]`}
         >
           {current.name}
@@ -271,19 +324,26 @@ const Act5_Outro = ({ onAction, onClose }: { onAction: () => void; onClose: () =
 // ГЛАВНЫЙ КОМПОНЕНТ
 // ============================================================================
 export function WarTrailer({ onClose, onAction }: Props) {
-  const [phase, setPhase] = useState(1);
+  const [phase, setPhase] = useState<number>(1);
 
   useEffect(() => {
+    // остальные фазы — дублируем обычный таймлайн, но фаза 2 теперь запускается когда Act1 вызовет onComplete
     const timeline = [
-      { p: 1, t: 0 },
-      { p: 2, t: 3000 },
-      { p: 3, t: 5500 },
-      { p: 4, t: 10000 },
-      { p: 5, t: 13000 }
+      // фаза 1: intro управляется Act1 и вызывает setPhase(2) через callback
+      { p: 3, t: 4200 }, // Act3 после показа фракций
+      { p: 4, t: 7600 },
+      { p: 5, t: 9800 }
     ];
+
     const timeouts = timeline.map(s => setTimeout(() => setPhase(s.p), s.t));
     return () => timeouts.forEach(clearTimeout);
   }, []);
+
+  // callback для Act1 — сразу переводим на фазу 2 (быстрый blackout анимация внутри Act1)
+  const handleIntroComplete = () => {
+    // small delay to allow a clean blackout snap
+    setPhase(2);
+  };
 
   return (
     <div className="fixed inset-0 z-[9999] bg-black overflow-hidden font-sans select-none">
@@ -296,12 +356,12 @@ export function WarTrailer({ onClose, onAction }: Props) {
           className="h-full bg-red-600"
           initial={{ width: "0%" }}
           animate={{ width: "100%" }}
-          transition={{ duration: 16, ease: "linear" }}
+          transition={{ duration: 10, ease: "linear" }}
         />
       </div>
 
       <AnimatePresence mode="wait">
-        {phase === 1 && <Act1_Intro />}
+        {phase === 1 && <Act1_Intro onComplete={handleIntroComplete} />}
         {phase === 2 && <Act2_Factions />}
         {phase === 3 && <Act3_WarArena />}
         {phase === 4 && <Act4_Blackout />}
