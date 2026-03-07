@@ -42,9 +42,6 @@ const WarStyles = () => (
 
     .war-vignette { position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, transparent 18%, rgba(0,0,0,0.98) 100%); z-index: 100; pointer-events: none; }
     .tactical-scanlines { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%); background-size: 100% 4px; z-index: 99; opacity: 0.3; pointer-events: none; }
-    
-    .strobe-flash { animation: strobe 0.06s steps(1) infinite; }
-    @keyframes strobe { 0% { opacity: 1 } 50% { opacity: 0.18 } 100% { opacity: 1 } }
   `}</style>
 );
 
@@ -68,7 +65,7 @@ const SubtleMathRain = ({ density = 8 }: { density?: number }) => {
           <motion.div
             key={i}
             initial={{ y: -120, x: Math.random() * 100 + "vw", opacity: 0 }}
-            animate={{ y: "115vh", opacity: [0, 1, 0] }}
+            animate={{ y: "115vh", opacity:[0, 1, 0] }}
             transition={{ duration: 3 + Math.random() * 3, repeat: Infinity, delay: i * 0.45, ease: 'linear' }}
             className="absolute text-slate-300 font-medium text-lg md:text-2xl"
             style={{ left: `${Math.random() * 80}vw` }}
@@ -109,8 +106,7 @@ const ArenaKeypad = ({ pressedKey, combo }: { pressedKey: string | null; combo?:
           const isPressed = pressedKey === k;
           return (
             <div key={k} className={`h-12 rounded-xl flex items-center justify-center font-bold text-xl transition-all duration-75 ${
-              isPressed ? 'bg-cyan-500 text-slate-900 scale-95 shadow-[0_0_20px_rgba(6,182,212,0.5)]' :
-              ['÷','×','−','+'].includes(k) ? 'bg-slate-900 text-cyan-400 border border-slate-800' : 'bg-slate-900 text-white border border-slate-800'
+              isPressed ? 'bg-cyan-500 text-slate-900 scale-95 shadow-[0_0_20px_rgba(6,182,212,0.5)]' :['÷','×','−','+'].includes(k) ? 'bg-slate-900 text-cyan-400 border border-slate-800' : 'bg-slate-900 text-white border border-slate-800'
             }`}>
               {k}
             </div>
@@ -135,30 +131,29 @@ const ArenaKeypad = ({ pressedKey, combo }: { pressedKey: string | null; combo?:
 
 const Act1_Intro = ({ onComplete }: { onComplete: () => void }) => {
   useEffect(() => {
-    // Увеличили время первой сцены для более кинематографичной паузы
-    const t3 = setTimeout(() => onComplete(), 3600);
+    // 4.8 секунды на весь первый акт для идеальной паузы
+    const t3 = setTimeout(() => onComplete(), 4800);
     return () => clearTimeout(t3);
   }, [onComplete]);
 
   return (
     <motion.div key="act1" exit={{ opacity: 0 }} className="absolute inset-0 bg-[#020617] flex flex-col items-center justify-center">
       <div className="text-center px-6">
-        {/* Первая фраза появляется и висит */}
         <motion.h1
           initial={{ opacity: 0, filter: 'blur(12px)', scale: 0.98 }}
           animate={{ opacity: 1, filter: 'blur(0px)', scale: 1 }}
-          transition={{ duration: 1.2, ease: 'easeOut' }}
+          transition={{ duration: 1.5, ease: 'easeOut' }}
           className="text-3xl md:text-5xl font-serif text-slate-400 tracking-[0.2em] uppercase leading-relaxed"
         >
           In a world
         </motion.h1>
 
-        {/* Вторая фраза бьет с задержкой, давая первой фразе "осесть" */}
+        {/* Пауза ровно 1 секунду перед появлением второго предложения */}
         <motion.h2
-          initial={{ opacity: 0, y: 18, scale: 0.96 }}
-          animate={{ opacity: 1, y: 0, scale: 1.02 }}
-          transition={{ delay: 1.5, duration: 0.8, ease: 'circOut' }}
-          className="text-2xl md:text-4xl font-serif text-white mt-6 font-black tracking-tight leading-tight"
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1.05 }}
+          transition={{ delay: 2.5, duration: 1.2, ease: 'circOut' }}
+          className="text-2xl md:text-4xl font-serif text-white mt-8 font-black tracking-tight leading-tight"
           style={{ letterSpacing: '0.04em' }}
         >
           WHERE <span className="text-cyan-400">INTELLIGENCE</span> IS <span className="text-red-500">POWER</span>
@@ -171,7 +166,6 @@ const Act1_Intro = ({ onComplete }: { onComplete: () => void }) => {
 const Act2_Factions = ({ onComplete }: { onComplete: () => void }) => {
   const [index, setIndex] = useState(0);
 
-  // Расширенный список боевых фракций (математических дисциплин)
   const factions =[
     { name: "ЛОГИКА", color: "text-emerald-400", bg: "bg-emerald-950", sub: "SYS_01: BASE_OPS" },
     { name: "АРИФМЕТИКА", color: "text-teal-400", bg: "bg-teal-950", sub: "SYS_02: PRIMITIVES" },
@@ -192,67 +186,84 @@ const Act2_Factions = ({ onComplete }: { onComplete: () => void }) => {
     { name: "ТЕОРИЯ ИГР", color: "text-teal-300", bg: "bg-teal-900", sub: "SYS_17: MINMAX" },
     { name: "АЛГОРИТМЫ", color: "text-cyan-300", bg: "bg-cyan-900", sub: "SYS_18: EXECUTION" },
     { name: "НЕЙРОСЕТИ", color: "text-blue-300", bg: "bg-blue-900", sub: "SYS_19: LEARNING" },
-    { name: "СИСТЕМА", color: "text-white", bg: "bg-white", sub: "CRITICAL OVERLOAD", strobe: true }
+    { name: "СИСТЕМА", color: "text-slate-900", bg: "bg-white", sub: "CRITICAL OVERLOAD", isFinal: true }
   ];
 
-  const startDelay = 180; // Начальная задержка
+  // Массив точных задержек (в мс) для идеального экспоненциального ускорения
+  const delays =[
+    400, 350, 300, 250, 200, 160, 130, 100, 80, 70,
+    60, 50, 45, 40, 35, 30, 30, 30, 30
+  ];
 
   useEffect(() => {
     let cancelled = false;
+    
     const tick = (i: number) => {
       if (cancelled) return;
+      
       if (i >= factions.length - 1) {
         setIndex(factions.length - 1);
-        setTimeout(() => { if (!cancelled) onComplete(); }, 350);
+        // ФИНАЛЬНЫЙ КАДР "СИСТЕМА" - висит ровно 150мс как вспышка и резко обрывается
+        setTimeout(() => { if (!cancelled) onComplete(); }, 150);
         return;
       }
-      // Экспоненциальное ускорение смены кадров (эффект втягивания в воронку)
-      const delay = Math.max(25, Math.round(startDelay * Math.pow(0.82, i)));
-      
+
+      const delay = delays[i] || 30;
       setTimeout(() => {
-        setIndex(prev => Math.min(prev + 1, factions.length - 1));
+        setIndex(i + 1);
         tick(i + 1);
       }, delay);
     };
+
     tick(0);
     return () => { cancelled = true; };
   }, [onComplete]);
 
   const current = factions[index];
-  // Длительность самой анимации подстраивается под скорость кадра
-  const delayForAnim = Math.max(0.02, Math.min(0.2, (Math.max(25, startDelay * Math.pow(0.82, index)) / 1000) * 0.9));
+  const animDuration = (delays[index] || 30) / 1000;
 
   return (
-    <motion.div key="act2" className={`absolute inset-0 flex flex-col items-center justify-center ${current.strobe ? 'strobe-flash' : current.bg}`}>
-      <TacticalHUD />
-      <SubtleMathRain density={12} />
+    <motion.div 
+      key="act2" 
+      // Без exit-анимации, чтобы был hard cut на арену (как в кино)
+      className={`absolute inset-0 flex flex-col items-center justify-center ${current.bg}`}
+    >
+      {!current.isFinal && <TacticalHUD />}
+      {!current.isFinal && <SubtleMathRain density={12} />}
       
-      {/* Информация о текущем модуле вверху экрана */}
-      <div className="absolute top-16 w-full px-8 flex justify-between text-slate-500 font-mono text-[10px] md:text-xs">
-        <span>{current.sub}</span>
-        <span>LOAD: {Math.round(((index + 1) / factions.length) * 100)}%</span>
-      </div>
+      {!current.isFinal && (
+        <div className="absolute top-16 w-full px-8 flex justify-between text-slate-500 font-mono text-[10px] md:text-xs">
+          <span>{current.sub}</span>
+          <span>LOAD: {Math.round(((index + 1) / factions.length) * 100)}%</span>
+        </div>
+      )}
 
       <div className="relative z-10 text-center w-full px-4">
-        <motion.h2
-          key={index}
-          initial={{ scale: 1.4, filter: 'blur(10px)', opacity: 0 }}
-          animate={{ scale: 1, filter: 'blur(0px)', opacity: 1 }}
-          transition={{ duration: delayForAnim, ease: 'linear' }}
-          className={`text-5xl md:text-[7rem] font-black uppercase tracking-tight ${current.color}`}
-        >
-          {current.name}
-        </motion.h2>
+        {current.isFinal ? (
+          // Финальный кадр — резкий, без блюра, черный текст на белом фоне
+          <h2 className="text-6xl md:text-[9rem] font-black uppercase tracking-tighter text-slate-900">
+            {current.name}
+          </h2>
+        ) : (
+          <motion.h2
+            key={index}
+            initial={{ scale: 1.3, filter: 'blur(8px)', opacity: 0.5 }}
+            animate={{ scale: 1, filter: 'blur(0px)', opacity: 1 }}
+            transition={{ duration: animDuration, ease: 'easeOut' }}
+            className={`text-5xl md:text-[7rem] font-black uppercase tracking-tight ${current.color}`}
+          >
+            {current.name}
+          </motion.h2>
+        )}
       </div>
     </motion.div>
   );
 };
 
-// Act3: АРЕНА С ТАКТИЧЕСКИМ ТАЙМЕРОМ
 const Act3_WarArena = ({ onComplete }: { onComplete: () => void }) => {
   const[battlePhase, setBattlePhase] = useState(0);
   const[combo, setCombo] = useState(0);
-  const[pressedKey, setPressedKey] = useState<string | null>(null);
+  const [pressedKey, setPressedKey] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState('00:04.50');
   
   const stoppedRef = useRef(false);
@@ -270,7 +281,7 @@ const Act3_WarArena = ({ onComplete }: { onComplete: () => void }) => {
     const t5 = setTimeout(() => { setPressedKey(null); setBattlePhase(4); }, 2050);
     const t6 = setTimeout(() => { 
       setBattlePhase(5); 
-      stoppedRef.current = true; // Останавливаем миллисекундный таймер
+      stoppedRef.current = true; // Тормозим миллисекундный таймер
     }, 2200); 
     const t7 = setTimeout(() => onComplete(), 3600);
 
@@ -280,11 +291,10 @@ const Act3_WarArena = ({ onComplete }: { onComplete: () => void }) => {
     };
   }, [onComplete]);
 
-  // Логика миллисекундного таймера
   useEffect(() => {
     let rafId: number;
     const startMs = Date.now();
-    const startValue = 4500; // 4.5 секунд
+    const startValue = 4500;
 
     const updateTimer = () => {
       if (stoppedRef.current) return;
@@ -296,9 +306,7 @@ const Act3_WarArena = ({ onComplete }: { onComplete: () => void }) => {
       const ms = Math.floor((current % 1000) / 10);
       setTimeLeft(`00:0${secs}.${ms.toString().padStart(2, '0')}`);
 
-      if (current > 0) {
-        rafId = requestAnimationFrame(updateTimer);
-      }
+      if (current > 0) rafId = requestAnimationFrame(updateTimer);
     };
     
     rafId = requestAnimationFrame(updateTimer);
@@ -389,7 +397,6 @@ const Act4_PremiumFinale = ({ onAction, onClose }: { onAction: () => void; onClo
   return (
     <motion.div key="act4" className="absolute inset-0 bg-[#010308] flex flex-col items-center justify-center z-[200] overflow-hidden">
       
-      {/* Легкое свечение на фоне */}
       <motion.div 
         initial={{ opacity: 0 }} 
         animate={{ opacity: 0.3 }} 
@@ -399,7 +406,6 @@ const Act4_PremiumFinale = ({ onAction, onClose }: { onAction: () => void; onClo
 
       <div className="relative z-40 flex flex-col items-center justify-center w-full px-4">
         
-        {/* Слоган: появляется и мягко уходит в блюр */}
         <motion.div
           initial={{ opacity: 0, filter: "blur(10px)", letterSpacing: "0.2em" }}
           animate={{ opacity: [0, 1, 1, 0], filter:["blur(10px)", "blur(0px)", "blur(0px)", "blur(10px)"], letterSpacing: "0.4em" }}
@@ -409,7 +415,6 @@ const Act4_PremiumFinale = ({ onAction, onClose }: { onAction: () => void; onClo
           The smartest survive
         </motion.div>
 
-        {/* Главный логотип плавно выезжает из темноты */}
         <motion.div 
           initial={{ opacity: 0, scale: 0.95, filter: "blur(20px)" }} 
           animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }} 
@@ -435,7 +440,7 @@ const Act4_PremiumFinale = ({ onAction, onClose }: { onAction: () => void; onClo
             whileHover={{ scale: 1.02, backgroundColor: "#f8fafc" }}
             whileTap={{ scale: 0.98 }}
             onClick={() => { onClose(); onAction(); }}
-            className="mt-16 px-10 py-4 bg-white text-black font-bold text-sm md:text-base uppercase tracking-widest flex items-center gap-3 transition-colors"
+            className="mt-16 px-10 py-4 bg-white text-black font-bold text-sm md:text-base uppercase tracking-widest flex items-center gap-3 transition-colors rounded-lg"
           >
             <Swords className="w-5 h-5" /> Enter Arena
           </motion.button>
@@ -454,23 +459,21 @@ export function WarTrailer({ onClose, onAction }: Props) {
   const gotoPhase = (p: number) => setPhase(p);
 
   return (
-    // Обертка с классом epic-color-grade применяет CSS-фильтр ко всему видео
     <div className="fixed inset-0 z-[9999] bg-black overflow-hidden font-sans select-none epic-color-grade">
       <WarStyles />
       
-      {/* СЛОИ ЦВЕТОКОРРЕКЦИИ (НАД ВСЕМ, КРОМЕ UI КНОПОК ЗАКРЫТИЯ ЕСЛИ НУЖНО) */}
       <div className="cinematic-tint" />
       <div className="film-grain-overlay" />
       <div className="war-vignette" />
       <div className="tactical-scanlines" />
 
-      {/* Полоска прогресса видео */}
+      {/* Полоска прогресса видео (Акт 1 + 2 + 3 + 4) = 4.8 + 1.8 + 3.6 + 3.0 ≈ 13.2с */}
       <div className="absolute top-0 left-0 h-1 bg-slate-900 w-full z-[10000]">
         <motion.div
           className="h-full bg-cyan-600"
           initial={{ width: '0%' }}
           animate={{ width: '100%' }}
-          transition={{ duration: 11, ease: 'linear' }}
+          transition={{ duration: 13.2, ease: 'linear' }}
         />
       </div>
 
