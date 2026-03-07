@@ -20,6 +20,7 @@ import { ResetPassword } from './components/ResetPassword';
 import { supabase } from './lib/supabase';
 import { Sector, Module } from './lib/supabase';
 import { FriendlyDuelModal } from './components/FriendlyDuelModal';
+import { PromoPage } from './components/PromoPage';
 
 // Добавлена иконка Users
 import { Loader, Crown, Settings, Shield, Zap, Keyboard, Lock, ClipboardList, ArrowRight, Users } from 'lucide-react';
@@ -590,6 +591,12 @@ function MainApp() {
 
 function App() {
   const [path, setPath] = useState(window.location.pathname);
+
+  useEffect(() => {
+    const handlePopState = () => setPath(window.location.pathname);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  },
 
   useEffect(() => {
     const handlePopState = () => setPath(window.location.pathname);
