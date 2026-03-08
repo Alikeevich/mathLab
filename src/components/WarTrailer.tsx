@@ -153,7 +153,7 @@ const Act1_Intro = ({ onComplete }: { onComplete: () => void }) => {
         <motion.h2
           initial={{ opacity: 0, y: 20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1.05 }}
-          transition={{ delay: 2.5, duration: 1.2, ease: 'circOut' }}
+          transition={{ delay: 2, duration: 1.2, ease: 'circOut' }}
           className="text-2xl md:text-4xl font-serif text-white mt-8 font-black tracking-tight leading-tight"
           style={{ letterSpacing: '0.04em' }}
         >
