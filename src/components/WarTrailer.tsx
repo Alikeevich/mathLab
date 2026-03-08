@@ -237,7 +237,7 @@ const Act3_WarArena = ({ onComplete }: { onComplete: () => void }) => {
       setBattlePhase(phase);
     };
     const t1 = setTimeout(() => setBattlePhase(1), 500);
-    const t2 = setTimeout(() => { triggerHit(1, 2); setPressedKey('2'); }, 1200);
+    const t2 = setTimeout(() => { triggerHit(1, 2); setPressedKey('±'); }, 1200);
     const t3 = setTimeout(() => setPressedKey(null), 1350);
     const t4 = setTimeout(() => { triggerHit(2, 3); setPressedKey('ENTER'); }, 1900);
     const t5 = setTimeout(() => { setPressedKey(null); setBattlePhase(4); }, 2050);
@@ -298,7 +298,7 @@ const Act3_WarArena = ({ onComplete }: { onComplete: () => void }) => {
             </div>
           </div>
           <div className={`w-full h-16 border rounded-xl flex items-center justify-center text-4xl font-mono font-bold transition-all duration-300 ${battlePhase >= 4 ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.3),inset_0_1px_2px_rgba(255,255,255,0.2)]' : 'bg-black/20 border-white/10 text-white shadow-[inset_0_1px_2px_rgba(255,255,255,0.05)]'}`}>
-            {battlePhase >= 3 ? <span>2.0</span> : battlePhase === 2 ? <span>2</span> : <motion.span animate={{ opacity: [1, 0] }} transition={{ repeat: Infinity, duration: 0.4 }}>_</motion.span>}
+            {battlePhase >= 3 ? <Latex>{"$\\frac{\\pi}{2}$"}</Latex> : battlePhase === 2 ? <Latex>{"$\\pi$"}</Latex> : <motion.span animate={{ opacity: [1, 0] }} transition={{ repeat: Infinity, duration: 0.4 }}>_</motion.span>}
           </div>
         </div>
         <ArenaKeypad pressedKey={pressedKey} combo={combo} />
