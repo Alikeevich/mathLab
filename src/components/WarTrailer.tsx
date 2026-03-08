@@ -288,8 +288,8 @@ const Act3_WarArena = ({ onComplete }: { onComplete: () => void }) => {
   useEffect(() => {
     const T = [
       setTimeout(() => { timerStopRef.current = true; setPhase('dissolve'); }, 2800),
-      setTimeout(() => setPhase('solve'),   3600),
-      setTimeout(() => setStepIdx(1),       4200),
+      setTimeout(() => setPhase('solve'),   3200),
+      setTimeout(() => setStepIdx(1),       3800),
       setTimeout(() => setStepIdx(2),       5400),
       setTimeout(() => setStepIdx(3),       6600),
       setTimeout(() => setStepIdx(4),       7800),
@@ -362,7 +362,7 @@ const Act3_WarArena = ({ onComplete }: { onComplete: () => void }) => {
         {/* ══ EQUATION ZONE — никогда не двигается ══ */}
         <motion.div
           className="relative flex-1 flex flex-col items-center justify-center py-10 px-4 min-h-[190px]"
-          animate={{ scale: dissolving ? 1.12 : 1 }}
+          animate={{ scale: dissolving ? 1.28 : 1 }}
           transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
         >
 
