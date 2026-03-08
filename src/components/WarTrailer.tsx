@@ -293,7 +293,7 @@ const Act3_WarArena = ({ onComplete }: { onComplete: () => void }) => {
       setTimeout(() => setStepIdx(2),       3600),
       setTimeout(() => setStepIdx(3),       4200),
       setTimeout(() => setStepIdx(4),       4800),
-      setTimeout(() => onComplete(),        5400),
+      setTimeout(() => onComplete(),        7000),
     ];
     return () => T.forEach(clearTimeout);
   }, [onComplete]);
