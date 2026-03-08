@@ -113,7 +113,7 @@ const ArenaKeypad = ({ pressedKey, combo }: { pressedKey: string | null; combo?:
         })}
       </div>
       <div className="flex gap-1.5">
-        <div className="h-10 flex- bg-white/5 border border-white/5 shadow-[0_4px_12px_rgba(0,0,0,0.2)] rounded-xl flex items-center justify-center text-sm font-bold text-slate-400">abc</div>
+        <div className="h-10 px-4 bg-white/5 border border-white/5 shadow-[0_4px_12px_rgba(0,0,0,0.2)] rounded-xl flex items-center justify-center text-sm font-bold text-slate-400">abc</div>
         <div className={`h-10 flex-[3.5] rounded-xl flex items-center justify-center font-bold tracking-widest transition-all duration-75 ${
           pressedKey === 'ENTER'
             ? 'bg-emerald-400 text-slate-900 scale-95 shadow-[0_0_30px_rgba(52,211,153,0.6)]'
@@ -140,7 +140,7 @@ const Act1_Intro = ({ onComplete }: { onComplete: () => void }) => {
         <motion.h1 initial={{ opacity: 0, filter: 'blur(12px)', scale: 0.98 }} animate={{ opacity: 1, filter: 'blur(0px)', scale: 1 }} transition={{ duration: 1.5, ease: 'easeOut' }} className="text-3xl md:text-5xl font-serif text-slate-400 tracking-[0.2em] uppercase leading-relaxed">
           In a world
         </motion.h1>
-        <motion.h2 initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1.05 }} transition={{ delay: 1.75, duration: 1.2, ease: 'circOut' }} className="text-2xl md:text-4xl font-serif text-white mt-8 font-black tracking-tight leading-tight" style={{ letterSpacing: '0.04em' }}>
+        <motion.h2 initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1.05 }} transition={{ delay: 2.5, duration: 1.2, ease: 'circOut' }} className="text-2xl md:text-4xl font-serif text-white mt-8 font-black tracking-tight leading-tight" style={{ letterSpacing: '0.04em' }}>
           WHERE <span className="text-cyan-400">INTELLIGENCE</span> IS <span className="text-red-500">POWER</span>
         </motion.h2>
       </div>
@@ -289,11 +289,11 @@ const Act3_WarArena = ({ onComplete }: { onComplete: () => void }) => {
     const T = [
       setTimeout(() => { timerStopRef.current = true; setPhase('dissolve'); }, 2200),
       setTimeout(() => setPhase('solve'),   2400),
-      setTimeout(() => setStepIdx(1),       3200),
-      setTimeout(() => setStepIdx(2),       4000),
-      setTimeout(() => setStepIdx(3),       4800),
-      setTimeout(() => setStepIdx(4),       5600),
-      setTimeout(() => onComplete(),        7000),
+      setTimeout(() => setStepIdx(1),       3000),
+      setTimeout(() => setStepIdx(2),       5400),
+      setTimeout(() => setStepIdx(3),       6600),
+      setTimeout(() => setStepIdx(4),       7800),
+      setTimeout(() => onComplete(),        10400),
     ];
     return () => T.forEach(clearTimeout);
   }, [onComplete]);
@@ -448,7 +448,7 @@ const Act3_WarArena = ({ onComplete }: { onComplete: () => void }) => {
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.9, duration: 0.7, ease: [0.16,1,0.3,1] }}
-            className="absolute bottom-24 flex items-center gap-2"
+            className="absolute bottom-28 flex items-center gap-2"
           >
             <CheckCircle2 className="w-4 h-4 text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,1)]" />
             <motion.span
