@@ -290,10 +290,10 @@ const Act3_WarArena = ({ onComplete }: { onComplete: () => void }) => {
       setTimeout(() => { timerStopRef.current = true; setPhase('dissolve'); }, 2200),
       setTimeout(() => setPhase('solve'),   2400),
       setTimeout(() => setStepIdx(1),       3000),
-      setTimeout(() => setStepIdx(2),       5400),
-      setTimeout(() => setStepIdx(3),       6600),
-      setTimeout(() => setStepIdx(4),       7800),
-      setTimeout(() => onComplete(),        10400),
+      setTimeout(() => setStepIdx(2),       3600),
+      setTimeout(() => setStepIdx(3),       4200),
+      setTimeout(() => setStepIdx(4),       4800),
+      setTimeout(() => onComplete(),        5400),
     ];
     return () => T.forEach(clearTimeout);
   }, [onComplete]);
