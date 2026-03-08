@@ -224,200 +224,240 @@ const Act2_Factions = ({ onComplete }: { onComplete: () => void }) => {
   );
 };
 
-// ─── Шаги решения (каждый ЗАМЕНЯЕТ предыдущий) ───────────────────────────────
-const SOLVE_STEPS = [
-  { label: "понижаем степень",    eq: "$$\\int_0^{\\pi} \\frac{1 - \\cos 2x}{2}\\, dx$$" },
-  { label: "разбиваем",           eq: "$$\\frac{1}{2}\\int_0^{\\pi} dx\\; -\\; \\frac{1}{2}\\int_0^{\\pi}\\!\\cos 2x\\, dx$$" },
-  { label: "интегрируем",         eq: "$$\\left[\\frac{x}{2} - \\frac{\\sin 2x}{4}\\right]_0^{\\pi}$$" },
-  { label: "ответ",               eq: "$$\\frac{\\pi}{2}$$", isAnswer: true },
+// ─── Token-level equation steps ──────────────────────────────────────────────
+// Токены с одинаковым id+tex НЕ анимируются (остаются на месте)
+// Токены с одинаковым id но другим tex — вылетают и прилетают
+type EqToken = { id: string; tex: string; big?: boolean };
+
+const EQ_STEPS: EqToken[][] = [
+  // 0 — оригинал
+  [
+    { id: 'int',       tex: '\\int_0^{\\pi}' },
+    { id: 'integrand', tex: '\\sin^2(x)' },
+    { id: 'dx',        tex: '\\,dx' },
+  ],
+  // 1 — понижаем степень (int и dx ОСТАЮТСЯ, только integrand меняется)
+  [
+    { id: 'int',       tex: '\\int_0^{\\pi}' },
+    { id: 'integrand', tex: '\\dfrac{1-\\cos 2x}{2}' },
+    { id: 'dx',        tex: '\\,dx' },
+  ],
+  // 2 — разбиваем
+  [
+    { id: 'left',  tex: '\\dfrac{1}{2}\\!\\int_0^{\\pi}\\!dx' },
+    { id: 'minus', tex: '-' },
+    { id: 'right', tex: '\\dfrac{1}{2}\\!\\int_0^{\\pi}\\!\\cos 2x\\,dx' },
+  ],
+  // 3 — берём интеграл
+  [
+    { id: 'bracket', tex: '\\left[\\dfrac{x}{2} - \\dfrac{\\sin 2x}{4}\\right]_0^{\\pi}' },
+  ],
+  // 4 — ответ
+  [
+    { id: 'answer', tex: '\\dfrac{\\pi}{2}', big: true },
+  ],
 ];
 
-// ─── Акт 3: телефон → уравнение вырывается → решение ─────────────────────────
+const STEP_LABELS = ['', 'понижаем степень', 'разбиваем', 'берём интеграл', '✦ ответ'];
+
+// ─── Акт 3 ───────────────────────────────────────────────────────────────────
 const Act3_WarArena = ({ onComplete }: { onComplete: () => void }) => {
-  // phase: 'phone' | 'free' | 'solve'
-  const [phase, setPhase] = useState<'phone' | 'free' | 'solve'>('phone');
-  const [solveStep, setSolveStep] = useState(-1); // -1 = оригинал, 0..3 = шаги
+  const [phase, setPhase]       = useState<'phone' | 'dissolve' | 'solve'>('phone');
+  const [stepIdx, setStepIdx]   = useState(0);
   const [timeLeft, setTimeLeft] = useState('00:04.50');
   const timerStopRef = useRef(false);
 
   // таймер
   useEffect(() => {
-    let rafId: number;
-    const startMs = Date.now();
-    const update = () => {
+    let raf: number;
+    const t0 = Date.now();
+    const tick = () => {
       if (timerStopRef.current) return;
-      const elapsed = Date.now() - startMs;
+      const elapsed = Date.now() - t0;
       const cur = Math.max(0, 4500 - elapsed);
-      const secs = Math.floor(cur / 1000);
+      const s  = Math.floor(cur / 1000);
       const ms = Math.floor((cur % 1000) / 10);
-      setTimeLeft(`00:0${secs}.${ms.toString().padStart(2, '0')}`);
-      if (cur > 0) rafId = requestAnimationFrame(update);
+      setTimeLeft(`00:0${s}.${ms.toString().padStart(2, '0')}`);
+      if (cur > 0) raf = requestAnimationFrame(tick);
     };
-    rafId = requestAnimationFrame(update);
-    return () => cancelAnimationFrame(rafId);
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   // оркестровка
   useEffect(() => {
-    // 2.8s — телефон замирает, chrome исчезает, уравнение остаётся
-    const t1 = setTimeout(() => { timerStopRef.current = true; setPhase('free'); }, 2800);
-    // 4.2s — начинаем решение (уравнение уже "свободно")
-    const t2 = setTimeout(() => { setPhase('solve'); setSolveStep(0); }, 4200);
-    // шаги с интервалом 1.6s
-    const t3 = setTimeout(() => setSolveStep(1), 5800);
-    const t4 = setTimeout(() => setSolveStep(2), 7400);
-    const t5 = setTimeout(() => setSolveStep(3), 9000);
-    // финал
-    const t6 = setTimeout(() => onComplete(), 11800);
-    return () => { [t1,t2,t3,t4,t5,t6].forEach(clearTimeout); };
+    const T = [
+      setTimeout(() => { timerStopRef.current = true; setPhase('dissolve'); }, 2800),
+      setTimeout(() => setPhase('solve'),   4000),
+      setTimeout(() => setStepIdx(1),       4700),
+      setTimeout(() => setStepIdx(2),       6300),
+      setTimeout(() => setStepIdx(3),       7900),
+      setTimeout(() => setStepIdx(4),       9500),
+      setTimeout(() => onComplete(),        12200),
+    ];
+    return () => T.forEach(clearTimeout);
   }, [onComplete]);
 
-  const chromeFaded = phase !== 'phone';
-  const isSolving   = phase === 'solve';
-  const isAnswer    = solveStep === 3;
+  const dissolving = phase !== 'phone';
+  const isSolving  = phase === 'solve';
+  const isAnswer   = stepIdx === 4;
+  const tokens     = EQ_STEPS[stepIdx];
 
   return (
     <motion.div key="act3" exit={{ opacity: 0 }} className="absolute inset-0 bg-[#020617] flex items-center justify-center overflow-hidden">
 
       {/* ambient blobs */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <motion.div animate={{ x:[0,60,-40,0], y:[0,-60,50,0] }} transition={{ duration:8, repeat:Infinity, ease:"easeInOut" }}
-          className="absolute top-[20%] left-[20%] w-80 h-80 bg-cyan-600/25 rounded-full blur-[90px]" />
-        <motion.div animate={{ x:[0,-50,70,0], y:[0,70,-40,0] }} transition={{ duration:10, repeat:Infinity, ease:"easeInOut" }}
+        <motion.div animate={{ x:[0,60,-40,0], y:[0,-60,50,0] }} transition={{ duration:8, repeat:Infinity, ease:'easeInOut' }}
+          className="absolute top-[20%] left-[20%] w-80 h-80 bg-cyan-600/20 rounded-full blur-[90px]" />
+        <motion.div animate={{ x:[0,-50,70,0], y:[0,70,-40,0] }} transition={{ duration:10, repeat:Infinity, ease:'easeInOut' }}
           className="absolute bottom-[20%] right-[20%] w-96 h-96 bg-red-600/15 rounded-full blur-[100px]" />
-        {/* свечение вокруг ответа */}
         <motion.div
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60vw] h-[60vw] rounded-full blur-[80px] pointer-events-none"
-          animate={{ opacity: isAnswer ? 0.18 : 0, scale: isAnswer ? 1.1 : 0.8 }}
-          transition={{ duration: 1.2, ease: "easeOut" }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60vw] h-[60vw] rounded-full"
           style={{ background: 'radial-gradient(circle, rgba(16,185,129,1) 0%, transparent 70%)' }}
+          animate={{ opacity: isAnswer ? 0.15 : 0 }}
+          transition={{ duration: 1.2 }}
         />
       </div>
 
-      {/* ── PHONE CHROME (исчезает) ── */}
-      <motion.div
-        className="absolute w-[320px] max-w-[88vw] flex flex-col pointer-events-none z-10"
-        style={{ top: '50%', transform: 'translateY(-50%)' }}
-        animate={{ opacity: chromeFaded ? 0 : 1, scale: chromeFaded ? 0.94 : 1 }}
-        transition={{ duration: 0.75, ease: [0.4, 0, 0.2, 1] }}
-      >
-        {/* телефонная рамка — фон и бордер */}
-        <div className="absolute inset-0 rounded-[2rem] bg-slate-900/40 backdrop-blur-2xl border border-white/10 shadow-[0_30px_100px_rgba(0,0,0,0.9)]" />
+      {/* ══ PHONE — один flex-контейнер, chrome фейдит opacity-only ══ */}
+      <div className="relative w-[320px] max-w-[88vw] flex flex-col z-20">
+
+        {/* phone background — фейдит, но занимает место */}
+        <motion.div
+          className="absolute inset-0 rounded-[2rem] bg-slate-900/40 backdrop-blur-2xl border border-white/10 shadow-[0_30px_100px_rgba(0,0,0,0.9),inset_0_1px_1px_rgba(255,255,255,0.15)]"
+          animate={{ opacity: dissolving ? 0 : 1 }}
+          transition={{ duration: 0.7, ease: [0.4,0,0.2,1] }}
+        />
+
         {/* header */}
-        <div className="relative bg-white/5 border-b border-white/10 pt-10 pb-4 px-6 flex justify-between items-center rounded-t-[2rem]">
+        <motion.div
+          className="relative bg-white/5 border-b border-white/10 rounded-t-[2rem] pt-10 pb-4 px-6 flex justify-between items-center"
+          animate={{ opacity: dissolving ? 0 : 1 }}
+          transition={{ duration: 0.55 }}
+        >
           <div className="flex flex-col">
             <span className="text-cyan-300 font-bold uppercase tracking-widest text-[10px] mb-1">YOU</span>
             <span className="text-3xl font-black text-white">15</span>
           </div>
           <div className="text-lg font-mono font-black flex items-center gap-2 text-red-400">
-            <Timer className="w-4 h-4 opacity-80" />
-            {timeLeft}
+            <Timer className="w-4 h-4 opacity-80" />{timeLeft}
           </div>
           <div className="flex flex-col text-right">
             <span className="text-red-400 font-bold uppercase tracking-widest text-[10px] mb-1">BOSS</span>
             <span className="text-3xl font-black text-white">14</span>
           </div>
-        </div>
+        </motion.div>
+
         {/* hp bars */}
-        <div className="relative flex h-1 bg-black/50 w-full">
+        <motion.div
+          className="relative flex h-1 bg-black/50 w-full"
+          animate={{ opacity: dissolving ? 0 : 1 }}
+          transition={{ duration: 0.5 }}
+        >
           <div className="bg-cyan-400 w-[90%] shadow-[0_0_10px_rgba(34,211,238,0.8)]" />
           <div className="bg-red-500 w-[90%] ml-auto shadow-[0_0_10px_rgba(239,68,68,0.8)]" />
+        </motion.div>
+
+        {/* ══ EQUATION ZONE — никогда не двигается ══ */}
+        <div className="relative flex-1 flex flex-col items-center justify-center py-10 px-4 min-h-[190px]">
+
+          {/* карточка-фон уравнения: исчезает при dissolve, emerald при ответе */}
+          <motion.div
+            className="absolute inset-3 rounded-2xl border"
+            animate={{
+              backgroundColor: isAnswer
+                ? 'rgba(16,185,129,0.08)'
+                : dissolving ? 'rgba(0,0,0,0)' : 'rgba(255,255,255,0.04)',
+              borderColor: isAnswer
+                ? 'rgba(16,185,129,0.35)'
+                : dissolving ? 'rgba(0,0,0,0)' : 'rgba(255,255,255,0.08)',
+            }}
+            transition={{ duration: 0.7 }}
+          />
+
+          {/* step label */}
+          <div className="relative h-5 mb-3 flex items-center justify-center">
+            <AnimatePresence mode="wait">
+              {isSolving && stepIdx > 0 && (
+                <motion.span
+                  key={stepIdx}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.3 }}
+                  className={`font-mono text-[10px] uppercase tracking-[0.3em] ${isAnswer ? 'text-emerald-400' : 'text-slate-500'}`}
+                >
+                  {STEP_LABELS[stepIdx]}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* TOKEN ROW — сердце анимации */}
+          {/* Одинаковый key (id:tex) = элемент остаётся на месте без анимации  */}
+          {/* Изменившийся key = старый вылетает вверх, новый влетает снизу     */}
+          <div className="relative flex flex-wrap items-center justify-center gap-x-1 gap-y-1 px-2">
+            <AnimatePresence mode="popLayout">
+              {tokens.map(token => (
+                <motion.div
+                  key={`${token.id}:${token.tex}`}
+                  layout
+                  initial={{ opacity: 0, y: 20, filter: 'blur(8px)', scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0,  filter: 'blur(0px)', scale: 1   }}
+                  exit={{   opacity: 0, y: -20, filter: 'blur(8px)', scale: 0.9 }}
+                  transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                  className={`inline-flex items-center justify-center
+                    ${isAnswer ? 'text-emerald-300' : 'text-white'}
+                    ${token.big ? 'text-5xl' : 'text-xl md:text-2xl'}`}
+                >
+                  <Latex>{`$${token.tex}$`}</Latex>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
         </div>
-        {/* пустое место под уравнение (реальное уравнение рендерится отдельно) */}
-        <div className="relative h-[140px]" />
-        {/* answer box */}
-        <div className="relative mx-6 mb-4 h-14 border border-white/10 rounded-xl bg-black/20 flex items-center justify-center">
-          <motion.span className="text-white/40 text-3xl font-mono" animate={{ opacity:[1,0] }} transition={{ repeat:Infinity, duration:0.5 }}>_</motion.span>
-        </div>
+
+        {/* answer input box */}
+        <motion.div
+          className="relative mx-6 mb-3 h-12 border border-white/10 rounded-xl bg-black/20 flex items-center justify-center"
+          animate={{ opacity: dissolving ? 0 : 1 }}
+          transition={{ duration: 0.5, delay: 0.05 }}
+        >
+          <motion.span className="text-white/40 text-2xl font-mono" animate={{ opacity:[1,0] }} transition={{ repeat:Infinity, duration:0.5 }}>_</motion.span>
+        </motion.div>
+
         {/* keypad */}
-        <div className="relative rounded-b-[2rem] overflow-hidden">
+        <motion.div
+          className="relative rounded-b-[2rem] overflow-hidden"
+          animate={{ opacity: dissolving ? 0 : 1 }}
+          transition={{ duration: 0.55, delay: 0.08 }}
+        >
           <ArenaKeypad pressedKey={null} combo={0} />
-        </div>
-      </motion.div>
+        </motion.div>
+      </div>
 
-      {/* ── УРАВНЕНИЕ — живёт отдельно, остаётся на месте ── */}
-      <motion.div
-        className="relative z-30 w-full max-w-[340px] flex flex-col items-center px-4"
-        initial={{ y: 0 }}
-        animate={
-          phase === 'phone' ? { y: 20 } :
-          phase === 'free'  ? { y: 0, scale: 1.08 } :
-          { y: 0, scale: 1 }
-        }
-        transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-      >
-        {/* метка шага — появляется только при решении */}
-        <motion.div
-          className="mb-3 font-mono text-[10px] uppercase tracking-[0.3em] text-slate-500 h-4"
-          animate={{ opacity: isSolving && solveStep >= 0 ? 1 : 0 }}
-          transition={{ duration: 0.4 }}
-        >
-          <AnimatePresence mode="wait">
+      {/* SOLVED badge */}
+      <AnimatePresence>
+        {isAnswer && (
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.9, duration: 0.7, ease: [0.16,1,0.3,1] }}
+            className="absolute bottom-16 flex items-center gap-2"
+          >
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,1)]" />
             <motion.span
-              key={solveStep}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.3 }}
+              initial={{ letterSpacing: '0.05em' }}
+              animate={{ letterSpacing: '0.4em' }}
+              transition={{ duration: 1.2, ease: 'easeOut' }}
+              className="text-sm font-black text-emerald-400 uppercase drop-shadow-[0_0_12px_rgba(16,185,129,0.8)]"
             >
-              {solveStep >= 0 ? (isAnswer ? '✦ ответ' : SOLVE_STEPS[solveStep]?.label) : ''}
+              Solved
             </motion.span>
-          </AnimatePresence>
-        </motion.div>
-
-        {/* само уравнение — плавно перетекает */}
-        <motion.div
-          className="w-full rounded-2xl text-center px-6 py-7 border"
-          animate={{
-            backgroundColor: isAnswer ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.04)',
-            borderColor:     isAnswer ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.08)',
-            boxShadow:       isAnswer
-              ? '0 0 60px rgba(16,185,129,0.2), inset 0 1px 1px rgba(255,255,255,0.1)'
-              : '0 0 0px rgba(0,0,0,0)',
-          }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-        >
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={solveStep}
-              initial={{ opacity: 0, y: 22, filter: 'blur(8px)' }}
-              animate={{ opacity: 1, y: 0,  filter: 'blur(0px)' }}
-              exit={{   opacity: 0, y: -22, filter: 'blur(8px)' }}
-              transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-              className={isAnswer ? 'text-emerald-300' : 'text-white'}
-            >
-              {solveStep < 0
-                ? <div className="text-2xl"><Latex>{"$$\\int_0^{\\pi} \\sin^2(x)\\, dx$$"}</Latex></div>
-                : isAnswer
-                  ? <div className="text-5xl font-light"><Latex>{SOLVE_STEPS[solveStep].eq}</Latex></div>
-                  : <div className="text-xl"><Latex>{SOLVE_STEPS[solveStep].eq}</Latex></div>
-              }
-            </motion.div>
-          </AnimatePresence>
-        </motion.div>
-
-        {/* SOLVED badge */}
-        <AnimatePresence>
-          {isAnswer && (
-            <motion.div
-              initial={{ opacity: 0, y: 10, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ delay: 0.5, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-              className="mt-8 flex items-center gap-2"
-            >
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,1)]" />
-              <motion.span
-                initial={{ letterSpacing: '0.05em' }}
-                animate={{ letterSpacing: '0.4em' }}
-                transition={{ duration: 1.2, ease: "easeOut" }}
-                className="text-sm font-black text-emerald-400 uppercase drop-shadow-[0_0_12px_rgba(16,185,129,0.8)]"
-              >
-                Solved
-              </motion.span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </motion.div>
   );
