@@ -11,7 +11,7 @@ type Props = {
 };
 
 // ============================================================================
-// СТИЛИ: ОБНОВЛЁННЫЕ (убрал старый tint, добавил мощный edge-glow)
+// СТИЛИ (без edge-glow)
 // ============================================================================
 const WarStyles = () => (
   <style>{`
@@ -27,17 +27,6 @@ const WarStyles = () => (
       opacity: 0.15;
       background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
       mix-blend-mode: overlay;
-    }
-
-    .edge-glow {
-      position: absolute;
-      inset: 0;
-      z-index: 9998;
-      pointer-events: none;
-      box-shadow: 
-        inset 0 0 140px rgba(220, 38, 38, 0.45),
-        inset 0 0 80px rgba(185, 28, 28, 0.25),
-        0 0 60px rgba(220, 38, 38, 0.2);
     }
 
     .war-vignette { 
@@ -106,7 +95,7 @@ const TacticalHUD = () => (
   </div>
 );
 
-// Клавиатура арены (GLASSMORPHISM)
+// Клавиатура арены
 const ArenaKeypad = ({ pressedKey, combo }: { pressedKey: string | null; combo?: number }) => {
   const rows = [['7','8','9','÷'],['4','5','6','×'],['1','2','3','−'],['±','0','.','+']];
   return (
@@ -146,7 +135,7 @@ const ArenaKeypad = ({ pressedKey, combo }: { pressedKey: string | null; combo?:
 };
 
 // ============================================================================
-// СЦЕНЫ (твои без изменений)
+// СЦЕНЫ (без изменений)
 // ============================================================================
 const Act1_Intro = ({ onComplete }: { onComplete: () => void }) => {
   useEffect(() => {
@@ -156,21 +145,10 @@ const Act1_Intro = ({ onComplete }: { onComplete: () => void }) => {
   return (
     <motion.div key="act1" exit={{ opacity: 0 }} className="absolute inset-0 bg-[#020617] flex flex-col items-center justify-center">
       <div className="text-center px-6">
-        <motion.h1
-          initial={{ opacity: 0, filter: 'blur(12px)', scale: 0.98 }}
-          animate={{ opacity: 1, filter: 'blur(0px)', scale: 1 }}
-          transition={{ duration: 1.5, ease: 'easeOut' }}
-          className="text-3xl md:text-5xl font-serif text-slate-400 tracking-[0.2em] uppercase leading-relaxed"
-        >
+        <motion.h1 initial={{ opacity: 0, filter: 'blur(12px)', scale: 0.98 }} animate={{ opacity: 1, filter: 'blur(0px)', scale: 1 }} transition={{ duration: 1.5, ease: 'easeOut' }} className="text-3xl md:text-5xl font-serif text-slate-400 tracking-[0.2em] uppercase leading-relaxed">
           In a world
         </motion.h1>
-        <motion.h2
-          initial={{ opacity: 0, y: 20, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1.05 }}
-          transition={{ delay: 2.5, duration: 1.2, ease: 'circOut' }}
-          className="text-2xl md:text-4xl font-serif text-white mt-8 font-black tracking-tight leading-tight"
-          style={{ letterSpacing: '0.04em' }}
-        >
+        <motion.h2 initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1.05 }} transition={{ delay: 2.5, duration: 1.2, ease: 'circOut' }} className="text-2xl md:text-4xl font-serif text-white mt-8 font-black tracking-tight leading-tight" style={{ letterSpacing: '0.04em' }}>
           WHERE <span className="text-cyan-400">INTELLIGENCE</span> IS <span className="text-red-500">POWER</span>
         </motion.h2>
       </div>
@@ -180,7 +158,7 @@ const Act1_Intro = ({ onComplete }: { onComplete: () => void }) => {
 
 const Act2_Factions = ({ onComplete }: { onComplete: () => void }) => {
   const[index, setIndex] = useState(0);
-  const factions =[ /* твой большой массив без изменений */ 
+  const factions =[ /* твой большой массив */ 
     { name: "ЛОГИКА", color: "text-emerald-400", bg: "bg-emerald-950", sub: "SYS_01: BASE_OPS" },
     { name: "АРИФМЕТИКА", color: "text-teal-400", bg: "bg-teal-950", sub: "SYS_02: PRIMITIVES" },
     { name: "АЛГЕБРА", color: "text-blue-400", bg: "bg-blue-950", sub: "SYS_03: VARIABLES" },
@@ -399,7 +377,6 @@ export function WarTrailer({ onClose, onAction }: Props) {
       <WarStyles />
       
       <div className="film-grain-overlay" />
-      <div className="edge-glow" />           {/* ← новый мощный red edge glow */}
       <div className="war-vignette" />
       <div className="tactical-scanlines" />
 
