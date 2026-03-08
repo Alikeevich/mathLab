@@ -20,6 +20,7 @@ import { ResetPassword } from './components/ResetPassword';
 import { supabase } from './lib/supabase';
 import { Sector, Module } from './lib/supabase';
 import { FriendlyDuelModal } from './components/FriendlyDuelModal';
+import { PromoPage } from './components/PromoPage';
 
 // Добавлена иконка Users
 import { Loader, Crown, Settings, Shield, Zap, Keyboard, Lock, ClipboardList, ArrowRight, Users } from 'lucide-react';
@@ -603,6 +604,9 @@ function App() {
       {(() => {
         if (path === '/terms-and-conditions' || path === '/terms') {
           return <TermsPage />;
+        }
+        if (path === '/promos') {
+          return <PromoPage />;
         }
         if (path === '/pricing') {
           return <PricingPage />;
