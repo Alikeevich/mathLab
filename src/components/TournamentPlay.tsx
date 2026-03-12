@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Latex from 'react-latex-next';
-import { Loader, Trophy, XCircle, Timer, Flag, AlertTriangle, WifiOff, CheckCircle2, XOctagon } from 'lucide-react';
+import { Loader, Trophy, XCircle, Timer, Flag, AlertTriangle, WifiOff, CheckCircle2, XOctagon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { MathKeypad } from './MathKeypad';
 import { MathInput } from './MathInput';
 import { checkAnswer } from '../lib/mathUtils';
