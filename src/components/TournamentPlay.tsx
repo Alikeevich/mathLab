@@ -70,6 +70,13 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     requestAnimationFrame(() => window.scrollTo(0, scrollY));
   };
 
+  const moveCursor = (direction: 'backward' | 'forward') => {
+    if (!mfRef.current) return;
+    const cmd = direction === 'backward' ? 'moveToPreviousChar' : 'moveToNextChar';
+    mfRef.current.executeCommand(cmd);
+    mfRef.current.focus({ preventScroll: true });
+  };
+
   const applyFinish = useCallback((wId: string, p1Score: number, p2Score: number) => {
     if (finishedRef.current) return;
     finishedRef.current = true;
