@@ -157,6 +157,9 @@ export function Dashboard({ onClose, onOpenLegal }: DashboardProps) {
 
   const faqList = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
+  const pvpRank = profile ? getPvPRank(profile.mmr || 1000) : null;
+  const isUnranked = profile ? !profile.has_calibrated : true;
+
   return (
     <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-sm z-[70] overflow-y-auto custom-scrollbar">
       <div className="max-w-6xl mx-auto p-4 md:p-8 animate-in fade-in duration-300 flex flex-col min-h-screen">
@@ -268,33 +271,47 @@ export function Dashboard({ onClose, onOpenLegal }: DashboardProps) {
                 </div>
               </div>
 
-              {/* STATS GRID */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+{/* STATS GRID (Теперь 4 колонки) */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 
+                {/* PVP РАНГ (НОВЫЙ БЛОК) */}
+                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-4 flex items-center gap-3 md:gap-4 group hover:border-slate-500 transition-colors">
+                  <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center text-4xl md:text-[2.5rem] group-hover:scale-110 transition-transform flex-shrink-0">
+                    {isUnranked ? <Target className="w-8 h-8 text-yellow-400" /> : pvpRank?.icon}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] md:text-xs text-slate-400 uppercase font-bold tracking-wider truncate">Рейтинг</div>
+                    <div className={`text-base md:text-xl font-black truncate ${isUnranked ? 'text-yellow-400' : pvpRank?.color}`}>
+                      {isUnranked ? 'Калибровка' : pvpRank?.name}
+                    </div>
+                    <div className="text-[10px] md:text-xs text-slate-500 font-mono mt-0.5">{profile.mmr || 1000} MP</div>
+                  </div>
+                </div>
+
                 {/* УРОВЕНЬ ИГРОКА (XP) */}
-                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-5 flex items-center gap-4">
-                  <div className="p-3 bg-purple-500/20 rounded-xl text-purple-400"><Target className="w-6 h-6" /></div>
-                  <div>
-                    <div className="text-xs text-slate-400 uppercase font-bold tracking-wider">Level (XP)</div>
-                    <div className="text-2xl font-black text-white">{profile.clearance_level}</div>
+                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-4 flex items-center gap-3 md:gap-4">
+                  <div className="p-2.5 md:p-3 bg-purple-500/20 rounded-xl text-purple-400 flex-shrink-0"><Target className="w-5 h-5 md:w-6 md:h-6" /></div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] md:text-xs text-slate-400 uppercase font-bold tracking-wider truncate">Level (XP)</div>
+                    <div className="text-xl md:text-2xl font-black text-white">{profile.clearance_level}</div>
                   </div>
                 </div>
 
                 {/* РЕШЕНО ЗАДАЧ */}
-                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-5 flex items-center gap-4">
-                  <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-400"><Zap className="w-6 h-6" /></div>
-                  <div>
-                    <div className="text-xs text-slate-400 uppercase font-bold tracking-wider">{t('dashboard.solved')}</div>
-                    <div className="text-2xl font-black text-white">{profile.total_experiments}</div>
+                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-4 flex items-center gap-3 md:gap-4">
+                  <div className="p-2.5 md:p-3 bg-emerald-500/20 rounded-xl text-emerald-400 flex-shrink-0"><Zap className="w-5 h-5 md:w-6 md:h-6" /></div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] md:text-xs text-slate-400 uppercase font-bold tracking-wider truncate">{t('dashboard.solved')}</div>
+                    <div className="text-xl md:text-2xl font-black text-white">{profile.total_experiments}</div>
                   </div>
                 </div>
 
                 {/* ТОЧНОСТЬ */}
-                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-5 flex items-center gap-4">
-                  <div className="p-3 bg-blue-500/20 rounded-xl text-blue-400"><TrendingUp className="w-6 h-6" /></div>
-                  <div>
-                    <div className="text-xs text-slate-400 uppercase font-bold tracking-wider">{t('dashboard.accuracy')}</div>
-                    <div className="text-2xl font-black text-white">{profile.success_rate.toFixed(0)}%</div>
+                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-4 flex items-center gap-3 md:gap-4">
+                  <div className="p-2.5 md:p-3 bg-blue-500/20 rounded-xl text-blue-400 flex-shrink-0"><TrendingUp className="w-5 h-5 md:w-6 md:h-6" /></div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] md:text-xs text-slate-400 uppercase font-bold tracking-wider truncate">{t('dashboard.accuracy')}</div>
+                    <div className="text-xl md:text-2xl font-black text-white">{profile.success_rate.toFixed(0)}%</div>
                   </div>
                 </div>
               </div>
