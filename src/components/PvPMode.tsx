@@ -17,7 +17,9 @@ import {
   AlertTriangle,
   Target,
   Info,
-  Users // <-- Добавлена иконка Users
+  Users,
+  ChevronLeft, // <-- добавили
+  ChevronRight // <-- добавили
 } from 'lucide-react';
 import { getPvPRank, getPvPShortRank } from '../lib/gameLogic';
 import { MathKeypad } from './MathKeypad';
@@ -392,6 +394,13 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     onSubmit: () => handleAnswer()
   };
 
+  const moveCursor = (direction: 'backward' | 'forward') => {
+    if (!mfRef.current) return;
+    const cmd = direction === 'backward' ? 'moveToPreviousChar' : 'moveToNextChar';
+    mfRef.current.executeCommand(cmd);
+    mfRef.current.focus({ preventScroll: true });
+  };
+
   // === End Game & Calibration Logic ===
   async function endGame(winnerId: string | null, eloChange: number = 0) {
     if (status === 'finished') return;
@@ -473,6 +482,8 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     const isUnranked = !!(profile && !profile.has_calibrated);
     const calibPlayed = profile?.calibration_matches_played ?? 0;
 
+    const myPvPRank = getPvPRank(profile?.mmr || 1000);
+
     return (
       <>
         {showRevealModal && revealRank && revealNewMMR !== null && revealOldMMR !== null && (
@@ -492,8 +503,19 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
               <Info className="w-5 h-5" />
             </button>
 
-            <div className="mx-auto w-24 h-24 bg-red-500/20 rounded-full flex items-center justify-center animate-pulse">
-              <Zap className="w-12 h-12 text-red-500" />
+            {/* ОГРОМНЫЙ РАНГ */}
+            <div className="mx-auto w-32 h-32 flex items-center justify-center relative mb-6">
+              {/* Аурическое свечение под цвет ранга */}
+              {!isUnranked && (
+                <div 
+                  className="absolute inset-0 opacity-30 blur-2xl rounded-full animate-pulse" 
+                  style={{ background: `radial-gradient(circle, ${myPvPRank.gradientFrom}, transparent 70%)` }} 
+                />
+              )}
+              
+              <div className="text-[6.5rem] drop-shadow-2xl z-10 hover:scale-110 transition-transform duration-500 cursor-default">
+                {isUnranked ? <Target className="w-20 h-20 text-yellow-400 drop-shadow-[0_0_15px_rgba(250,204,21,0.5)]" /> : myPvPRank.icon}
+              </div>
             </div>
 
             <div>
@@ -754,17 +776,36 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
               </div>
             </div>
           ) : (
-            <div className="p-2">
-              <div className="mb-2 px-1">
-                <MathInput
-                  value={userAnswer}
-                  onChange={setUserAnswer}
-                  onSubmit={handleAnswer}
-                  mfRef={mfRef}
-                />
-              </div>
-              <MathKeypad {...keypadProps} />
+          <div className="p-2">
+            <div className="mb-2 px-1">
+              <MathInput
+                value={userAnswer}
+                onChange={setUserAnswer}
+                onSubmit={handleAnswer}
+                mfRef={mfRef}
+              />
             </div>
+            
+            <MathKeypad {...keypadProps} />
+
+            {/* Панель со стрелками как в Реакторе */}
+            <div className="flex justify-start items-center pt-3 px-1 pb-1">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => moveCursor('backward')}
+                  className="p-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl transition-colors active:scale-95 shadow-lg"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <button
+                  onClick={() => moveCursor('forward')}
+                  className="p-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl transition-colors active:scale-95 shadow-lg"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+          </div>
           )}
         </div>
       </div>

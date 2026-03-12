@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import Latex from 'react-latex-next';
-import { Loader, Trophy, XCircle, Timer, Flag, AlertTriangle, WifiOff, CheckCircle2, XOctagon } from 'lucide-react';
+import { Loader, Trophy, XCircle, Timer, Flag, AlertTriangle, WifiOff, CheckCircle2, XOctagon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { MathKeypad } from './MathKeypad';
 import { MathInput } from './MathInput';
 import { checkAnswer } from '../lib/mathUtils';
@@ -68,6 +68,13 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
     mfRef.current.setValue('');
     setUserAnswer('');
     requestAnimationFrame(() => window.scrollTo(0, scrollY));
+  };
+
+  const moveCursor = (direction: 'backward' | 'forward') => {
+    if (!mfRef.current) return;
+    const cmd = direction === 'backward' ? 'moveToPreviousChar' : 'moveToNextChar';
+    mfRef.current.executeCommand(cmd);
+    mfRef.current.focus({ preventScroll: true });
   };
 
   const applyFinish = useCallback((wId: string, p1Score: number, p2Score: number) => {
@@ -456,22 +463,41 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
             </div>
           </div>
         ) : (
-          <div className="p-2">
-            <div className="mb-2 px-1">
-              <MathInput
-                value={userAnswer}
-                onChange={setUserAnswer}
-                onSubmit={() => handleAnswer()}
-                mfRef={mfRef}
-              />
-            </div>
-            <MathKeypad
-              onCommand={handleKeypadCommand}
-              onDelete={handleKeypadDelete}
-              onClear={handleKeypadClear}
+        <div className="p-2">
+          <div className="mb-2 px-1">
+            <MathInput
+              value={userAnswer}
+              onChange={setUserAnswer}
               onSubmit={() => handleAnswer()}
+              mfRef={mfRef}
             />
           </div>
+          
+          <MathKeypad
+            onCommand={handleKeypadCommand}
+            onDelete={handleKeypadDelete}
+            onClear={handleKeypadClear}
+            onSubmit={() => handleAnswer()}
+          />
+
+          {/* Панель со стрелками как в Реакторе */}
+          <div className="flex justify-start items-center pt-3 px-1 pb-1">
+            <div className="flex gap-2">
+              <button
+                onClick={() => moveCursor('backward')}
+                className="p-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl transition-colors active:scale-95 shadow-lg"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+              <button
+                onClick={() => moveCursor('forward')}
+                className="p-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl transition-colors active:scale-95 shadow-lg"
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+            </div>
+          </div>
+        </div>
         )}
       </div>
     </div>
