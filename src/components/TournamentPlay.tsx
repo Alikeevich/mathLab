@@ -464,7 +464,8 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
           </div>
         ) : (
           <div className="p-2">
-            <div className="mb-2 px-1">
+          <div className="mb-2 px-1 flex gap-2">
+            <div className="flex-1 min-w-0">
               <MathInput
                 value={userAnswer}
                 onChange={setUserAnswer}
@@ -472,13 +473,28 @@ export function TournamentPlay({ duelId, onFinished }: Props) {
                 mfRef={mfRef}
               />
             </div>
-            <MathKeypad
-              onCommand={handleKeypadCommand}
-              onDelete={handleKeypadDelete}
-              onClear={handleKeypadClear}
-              onSubmit={() => handleAnswer()}
-            />
+            <div className="flex gap-1 shrink-0">
+              <button
+                onClick={() => moveCursor('backward')}
+                className="px-2.5 bg-slate-800 hover:bg-slate-700 text-cyan-400 rounded-xl transition-colors active:scale-95 border border-cyan-500/30 flex items-center justify-center shadow-inner"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+              <button
+                onClick={() => moveCursor('forward')}
+                className="px-2.5 bg-slate-800 hover:bg-slate-700 text-cyan-400 rounded-xl transition-colors active:scale-95 border border-cyan-500/30 flex items-center justify-center shadow-inner"
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+            </div>
           </div>
+          <MathKeypad
+            onCommand={handleKeypadCommand}
+            onDelete={handleKeypadDelete}
+            onClear={handleKeypadClear}
+            onSubmit={() => handleAnswer()}
+          />
+        </div>
         )}
       </div>
     </div>
