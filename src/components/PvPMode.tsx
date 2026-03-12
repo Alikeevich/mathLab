@@ -482,6 +482,8 @@ export function PvPMode({ onBack, initialDuelId }: Props) {
     const isUnranked = !!(profile && !profile.has_calibrated);
     const calibPlayed = profile?.calibration_matches_played ?? 0;
 
+    const myPvPRank = getPvPRank(profile?.mmr || 1000);
+
     return (
       <>
         {showRevealModal && revealRank && revealNewMMR !== null && revealOldMMR !== null && (
