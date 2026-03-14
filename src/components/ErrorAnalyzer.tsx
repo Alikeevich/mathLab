@@ -51,7 +51,16 @@ type ErrorAnalyzerProps = {
 // === ФИКС ОТОБРАЖЕНИЯ ===
 // Убирает лишние $ и оборачивает в один слой $...$
 const renderMath = (text: string) => {
-  return text || '';
+  if (!text) return '';
+
+  // Если в строке есть дробь (\frac) или корень (\sqrt), 
+  // но нет знаков $, оборачиваем всю строку для рендеринга.
+  // Но осторожно: если там есть текст, он снова слипнется.
+  if (text.includes('\\') && !text.includes('$')) {
+    return `$${text}$`;
+  }
+
+  return text;
 };
 
 function TheoryContent({ text }: { text: string }) {
