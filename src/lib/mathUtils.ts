@@ -658,7 +658,7 @@ export function checkAnswer(userAnswer: string, dbAnswer: string): boolean {
 
   // ── 1. НЕРАВЕНСТВА И ИНТЕРВАЛЫ ─────────────────────────────────────────
   if (isInterval(u) || isInterval(d)) {
-    const splitUnion = (s: string) => s.split(/\s*[Uu∪]\s*/).map(p => p.trim()).filter(Boolean);
+    const splitUnion = (s: string) => s.replace(/\\cup/g, '∪').split(/\s*[Uu∪]\s*/).map(p => p.trim()).filter(Boolean);
     const uParts = splitUnion(u);
     const dParts = splitUnion(d);
     if (uParts.length !== dParts.length) return false;
