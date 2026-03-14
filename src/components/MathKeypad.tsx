@@ -26,8 +26,8 @@ const D = () => (
 );
 
 export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypadProps) {
-  const[mainTab, setMainTab] = useState<MainTab>('math');
-  const[subTab, setSubTab] = useState<SubTab>('basic');
+  const [mainTab, setMainTab] = useState<MainTab>('math');
+  const [subTab, setSubTab] = useState<SubTab>('basic');
   const [isShift, setIsShift] = useState(false);
   const [longPressMenu, setLongPressMenu] = useState<{ options: any[]; keyId: string } | null>(null);
 
@@ -49,53 +49,33 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
       window.removeEventListener('keydown', handleKeyPress);
       if (longPressTimer.current) clearTimeout(longPressTimer.current);
     };
-  },[]);
+  }, []);
 
   const handlePressStart = useCallback((options: any[] | undefined, keyId: string) => {
     isLongPressTriggered.current = false;
     if (!options || options.length === 0) return;
-
     longPressTimer.current = setTimeout(() => {
       isLongPressTriggered.current = true;
       setLongPressMenu({ options, keyId });
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(50);
-      }
+      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50);
     }, 400);
-  },[]);
+  }, []);
 
   const handlePressEnd = useCallback((e: React.PointerEvent, action: () => void) => {
     e.preventDefault();
-
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-
-    if (!isLongPressTriggered.current) {
-      action();
-    }
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+    if (!isLongPressTriggered.current) action();
     isLongPressTriggered.current = false;
-
     try { (e.target as Element).releasePointerCapture(e.pointerId); } catch {}
-  },[]);
+  }, []);
 
   const handlePressCancel = useCallback(() => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
     isLongPressTriggered.current = false;
-  },[]);
+  }, []);
 
   const Key = ({
-    id,
-    label,
-    onClick,
-    className,
-    hasMenu = false,
-    menuOptions,
-    children,
+    id, label, onClick, className, hasMenu = false, menuOptions, children,
   }: {
     id?: string;
     label?: React.ReactNode | string;
@@ -125,31 +105,59 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
   );
 
   // === ВКЛАДКА 1: БАЗОВАЯ ===
-  const basicKeys: KeyDef[][] = [[
+  const basicKeys: KeyDef[][] = [
+    [
       { label: <div className="flex items-center">( )</div>, cmd: 'insert', arg: '\\left( #0 \\right)' },
-      { label: '>', cmd: 'insert', arg: '>', hasMenu: true, menuOptions:[{label:'<', cmd:'insert', arg:'<'}, {label:'≥', cmd:'insert', arg:'\\geq'}, {label:'≤', cmd:'insert', arg:'\\leq'}, {label:'≠', cmd:'insert', arg:'\\neq'}, {label:'≈', cmd:'insert', arg:'\\approx'}] },
+      {
+        label: '>',
+        cmd: 'insert', arg: '>',
+        hasMenu: true,
+        menuOptions: [
+          { label: '<',  cmd: 'insert', arg: '<' },
+          { label: '≥',  cmd: 'insert', arg: '\\geq' },
+          { label: '≤',  cmd: 'insert', arg: '\\leq' },
+          { label: '≠',  cmd: 'insert', arg: '\\neq' },
+          { label: '≈',  cmd: 'insert', arg: '\\approx' },
+        ],
+      },
       { label: '7', cmd: 'insert', arg: '7', className: 'bg-slate-700 text-white text-xl font-semibold' },
       { label: '8', cmd: 'insert', arg: '8', className: 'bg-slate-700 text-white text-xl font-semibold' },
       { label: '9', cmd: 'insert', arg: '9', className: 'bg-slate-700 text-white text-xl font-semibold' },
       { label: '÷', cmd: 'insert', arg: '\\div', className: 'bg-slate-800 text-cyan-400 text-2xl' },
     ],[
-      { 
+      {
         label: (
           <div className="flex flex-col items-center justify-center">
             <D/>
             <div className="w-[16px] h-[1.5px] bg-white my-[2px] rounded-full"/>
             <D/>
           </div>
-        ), 
-        cmd: 'insert', arg: '\\frac{#0}{#?}' 
+        ),
+        cmd: 'insert', arg: '\\frac{#0}{#?}',
       },
-      { label: <div className="flex items-center">√<D/></div>, cmd: 'insert', arg: '\\sqrt{#?}', hasMenu: true, menuOptions:[{label:<div className="flex items-center">∛<D/></div>, cmd:'insert', arg:'\\sqrt[3]{#?}'}, {label:<div className="flex items-center"><span className="text-[10px] -mt-2 mr-[1px]">n</span>√<D/></div>, cmd:'insert', arg:'\\sqrt[#?]{#0}'}] },
+      {
+        label: <div className="flex items-center">√<D/></div>,
+        cmd: 'insert', arg: '\\sqrt{#?}',
+        hasMenu: true,
+        menuOptions: [
+          { label: <div className="flex items-center">∛<D/></div>, cmd: 'insert', arg: '\\sqrt[3]{#?}' },
+          { label: <div className="flex items-center"><span className="text-[10px] -mt-2 mr-[1px]">n</span>√<D/></div>, cmd: 'insert', arg: '\\sqrt[#?]{#0}' },
+        ],
+      },
       { label: '4', cmd: 'insert', arg: '4', className: 'bg-slate-700 text-white text-xl font-semibold' },
       { label: '5', cmd: 'insert', arg: '5', className: 'bg-slate-700 text-white text-xl font-semibold' },
       { label: '6', cmd: 'insert', arg: '6', className: 'bg-slate-700 text-white text-xl font-semibold' },
       { label: '×', cmd: 'insert', arg: '\\times', className: 'bg-slate-800 text-cyan-400 text-2xl' },
     ],[
-      { label: <div className="flex items-center"><D/>²</div>, cmd: 'insert', arg: '#0^{2}', hasMenu: true, menuOptions:[{label:<div className="flex items-center"><D/>ⁿ</div>, cmd:'insert', arg:'#0^{#?}'}, {label:<div className="flex items-center"><D/>⁻¹</div>, cmd:'insert', arg:'#0^{-1}'}] },
+      {
+        label: <div className="flex items-center"><D/>²</div>,
+        cmd: 'insert', arg: '#0^{2}',
+        hasMenu: true,
+        menuOptions: [
+          { label: <div className="flex items-center"><D/>ⁿ</div>,  cmd: 'insert', arg: '#0^{#?}' },
+          { label: <div className="flex items-center"><D/>⁻¹</div>, cmd: 'insert', arg: '#0^{-1}' },
+        ],
+      },
       { label: <span className="font-serif italic text-xl">x</span>, cmd: 'insert', arg: 'x' },
       { label: '1', cmd: 'insert', arg: '1', className: 'bg-slate-700 text-white text-xl font-semibold' },
       { label: '2', cmd: 'insert', arg: '2', className: 'bg-slate-700 text-white text-xl font-semibold' },
@@ -157,55 +165,55 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
       { label: '−', cmd: 'insert', arg: '-', className: 'bg-slate-800 text-cyan-400 text-2xl' },
     ],[
       { label: '±', cmd: 'insert', arg: '\\pm', className: 'text-xl' },
-      { label: ';', cmd: 'insert', arg: ';', className: 'text-xl font-bold' },
+      // ; — короткое нажатие, долгое → ∪ и ∩
+      {
+        label: ';',
+        cmd: 'insert', arg: ';',
+        className: 'text-xl font-bold',
+        hasMenu: true,
+        menuOptions: [
+          { label: '∪', cmd: 'insert', arg: '\\cup' },
+          { label: '∩', cmd: 'insert', arg: '\\cap' },
+        ],
+      },
       { label: '0', cmd: 'insert', arg: '0', className: 'bg-slate-700 text-white text-xl font-semibold' },
       { label: '.', cmd: 'insert', arg: '.', className: 'bg-slate-700 text-white text-xl font-semibold' },
       { label: '=', cmd: 'insert', arg: '=', className: 'bg-slate-800 text-white text-2xl' },
       { label: '+', cmd: 'insert', arg: '+', className: 'bg-slate-800 text-cyan-400 text-2xl' },
-    ]
+    ],
   ];
 
   // === ВКЛАДКА 2: ФУНКЦИИ ===
-  const funcKeys: KeyDef[][] = [[
+  const funcKeys: KeyDef[][] = [
+    [
       { label: <div className="flex items-center">|<D/>|</div>, cmd: 'insert', arg: '\\left|#?\\right|' },
       { label: 'f(x)', cmd: 'insert', arg: 'f(x)' },
       { label: 'g(x)', cmd: 'insert', arg: 'g(x)' },
-      { label: 'e', cmd: 'insert', arg: 'e', className: 'italic font-serif' },
-      { label: 'i', cmd: 'insert', arg: 'i', className: 'font-serif italic' },
-      { label: '!', cmd: 'insert', arg: '!' },
+      { label: 'e',    cmd: 'insert', arg: 'e',  className: 'italic font-serif' },
+      { label: 'i',    cmd: 'insert', arg: 'i',  className: 'font-serif italic' },
+      { label: '!',    cmd: 'insert', arg: '!' },
     ],[
       { label: <div className="flex items-center">ln<D/></div>, cmd: 'insert', arg: '\\ln(#?)' },
       { label: <div className="flex items-center">log<sub className="text-[10px] mt-2">10</sub></div>, cmd: 'insert', arg: '\\log_{10}(#?)' },
-      { label: <div className="flex items-center">log<sub className="text-[10px] mt-2">2</sub></div>, cmd: 'insert', arg: '\\log_{2}(#?)' },
+      { label: <div className="flex items-center">log<sub className="text-[10px] mt-2">2</sub></div>,  cmd: 'insert', arg: '\\log_{2}(#?)' },
       { label: <div className="flex items-center">log<sub className="text-[10px] mt-2"><D/></sub></div>, cmd: 'insert', arg: '\\log_{#?}(#0)' },
       { label: 'sign', cmd: 'insert', arg: '\\text{sign}(#?)' },
-      { label: 'z̄', cmd: 'insert', arg: '\\bar{z}' },
+      { label: 'z̄',   cmd: 'insert', arg: '\\bar{z}' },
     ],[
-      { label: <div className="flex items-center">[<D/>]</div>, cmd: 'insert', arg: '\\begin{bmatrix} #? \\end{bmatrix}' },
-      { label: <div className="flex items-center">||<D/>||</div>, cmd: 'insert', arg: '\\begin{vmatrix} #? \\end{vmatrix}' },
+      { label: <div className="flex items-center">[<D/>]</div>,    cmd: 'insert', arg: '\\begin{bmatrix} #? \\end{bmatrix}' },
+      { label: <div className="flex items-center">||<D/>||</div>,  cmd: 'insert', arg: '\\begin{vmatrix} #? \\end{vmatrix}' },
       { label: 'Cₙᵏ', cmd: 'insert', arg: 'C_{#?}^{#0}' },
       { label: 'Aₙᵏ', cmd: 'insert', arg: 'A_{#?}^{#0}' },
-      { label: 'Pₙ', cmd: 'insert', arg: 'P_{#?}' },
+      { label: 'Pₙ',  cmd: 'insert', arg: 'P_{#?}' },
       { label: <div className="flex flex-col items-center text-[10px] leading-tight">(<span>n</span><span>k</span>)</div>, cmd: 'insert', arg: '\\binom{#?}{#0}' },
     ],[
       { label: 'lim', cmd: 'insert', arg: '\\lim_{#? \\to #0}' },
-      // ∪ — основная кнопка, долгое нажатие → ∞ и ∩
-      {
-        label: '∪',
-        cmd: 'insert',
-        arg: '\\cup',
-        className: 'text-xl font-bold',
-        hasMenu: true,
-        menuOptions: [
-          { label: '∞', cmd: 'insert', arg: '\\infty' },
-          { label: '∩', cmd: 'insert', arg: '\\cap' },
-        ],
-      },
-      { label: '∫', cmd: 'insert', arg: '\\int' },
-      { label: '∑', cmd: 'insert', arg: '\\sum' },
-      { label: '∏', cmd: 'insert', arg: '\\prod' },
-      { label: '%', cmd: 'insert', arg: '\\%' },
-    ]
+      { label: '∞',   cmd: 'insert', arg: '\\infty' },
+      { label: '∫',   cmd: 'insert', arg: '\\int' },
+      { label: '∑',   cmd: 'insert', arg: '\\sum' },
+      { label: '∏',   cmd: 'insert', arg: '\\prod' },
+      { label: '%',   cmd: 'insert', arg: '\\%' },
+    ],
   ];
 
   // === ВКЛАДКА 3: ТРИГОНОМЕТРИЯ ===
@@ -214,19 +222,19 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
     ['arcsin', 'arccos', 'arctan', 'arccot', 'arcsec', 'arccsc'].map(k => ({ label: k, cmd: 'insert', arg: `\\${k}(#?)` })),
     [
       { label: 'rad', cmd: 'insert', arg: '\\text{rad}' },
-      { label: '°', cmd: 'insert', arg: '^\\circ' },
-      { label: 'α', cmd: 'insert', arg: '\\alpha', className: 'font-serif italic text-lg' },
-      { label: 'β', cmd: 'insert', arg: '\\beta', className: 'font-serif italic text-lg' },
-      { label: 'γ', cmd: 'insert', arg: '\\gamma', className: 'font-serif italic text-lg' },
-      { label: 'θ', cmd: 'insert', arg: '\\theta', className: 'font-serif italic text-lg' },
+      { label: '°',   cmd: 'insert', arg: '^\\circ' },
+      { label: 'α',   cmd: 'insert', arg: '\\alpha',  className: 'font-serif italic text-lg' },
+      { label: 'β',   cmd: 'insert', arg: '\\beta',   className: 'font-serif italic text-lg' },
+      { label: 'γ',   cmd: 'insert', arg: '\\gamma',  className: 'font-serif italic text-lg' },
+      { label: 'θ',   cmd: 'insert', arg: '\\theta',  className: 'font-serif italic text-lg' },
     ],[
-      { label: 'π', cmd: 'insert', arg: '\\pi', className: 'font-serif italic text-lg' },
-      { label: 'φ', cmd: 'insert', arg: '\\phi', className: 'font-serif italic text-lg' },
-      { label: 'ω', cmd: 'insert', arg: '\\omega', className: 'font-serif italic text-lg' },
-      { label: 'Δ', cmd: 'insert', arg: '\\Delta', className: 'text-lg' },
-      { label: 'Ω', cmd: 'insert', arg: '\\Omega', className: 'text-lg' },
-      { label: 'λ', cmd: 'insert', arg: '\\lambda', className: 'font-serif italic text-lg' },
-    ]
+      { label: 'π',   cmd: 'insert', arg: '\\pi',     className: 'font-serif italic text-lg' },
+      { label: 'φ',   cmd: 'insert', arg: '\\phi',    className: 'font-serif italic text-lg' },
+      { label: 'ω',   cmd: 'insert', arg: '\\omega',  className: 'font-serif italic text-lg' },
+      { label: 'Δ',   cmd: 'insert', arg: '\\Delta',  className: 'text-lg' },
+      { label: 'Ω',   cmd: 'insert', arg: '\\Omega',  className: 'text-lg' },
+      { label: 'λ',   cmd: 'insert', arg: '\\lambda', className: 'font-serif italic text-lg' },
+    ],
   ];
 
   const qwertyRows = [
@@ -337,7 +345,9 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
                 key={tab.id}
                 onClick={() => setSubTab(tab.id as SubTab)}
                 className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors whitespace-nowrap ${
-                  subTab === tab.id ? 'bg-cyan-500 text-slate-900' : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                  subTab === tab.id
+                    ? 'bg-cyan-500 text-slate-900'
+                    : 'bg-slate-800 text-slate-400 hover:text-slate-200'
                 }`}
               >
                 {tab.label}
@@ -345,7 +355,6 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
             ))}
           </div>
 
-          {/* DYNAMIC GRIDS */}
           {subTab === 'basic' && renderGrid(basicKeys)}
           {subTab === 'func'  && renderGrid(funcKeys)}
           {subTab === 'trig'  && renderGrid(trigKeys)}
@@ -356,7 +365,10 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
           {qwertyRows.map((row, i) => (
             <div key={i} className={`flex justify-center gap-1.5 ${i === 1 ? 'px-4' : i === 2 ? 'px-8' : ''}`}>
               {i === 2 && (
-                <Key onClick={() => setIsShift(!isShift)} className={`flex-1 max-w-[45px] ${isShift ? 'bg-cyan-600 text-white' : 'bg-slate-700 text-slate-300'}`}>⇧</Key>
+                <Key
+                  onClick={() => setIsShift(!isShift)}
+                  className={`flex-1 max-w-[45px] ${isShift ? 'bg-cyan-600 text-white' : 'bg-slate-700 text-slate-300'}`}
+                >⇧</Key>
               )}
               {row.map(char => {
                 const c = isShift ? char.toUpperCase() : char;
@@ -367,15 +379,17 @@ export function MathKeypad({ onCommand, onDelete, onClear, onSubmit }: MathKeypa
                 );
               })}
               {i === 2 && (
-                <Key onClick={onDelete} className="flex-1 max-w-[45px] bg-slate-700 text-slate-300"><Delete size={18} /></Key>
+                <Key onClick={onDelete} className="flex-1 max-w-[45px] bg-slate-700 text-slate-300">
+                  <Delete size={18} />
+                </Key>
               )}
             </div>
           ))}
           <div className="flex justify-center gap-1.5 mt-1 px-2">
             <Key onClick={() => setMainTab('math')} className="flex-[1.5] max-w-[60px] bg-slate-700 text-slate-300 text-sm font-bold py-3">123</Key>
-            <Key onClick={() => onCommand('insert', ',')} className="flex-1 max-w-[40px] bg-slate-800 text-white py-3">,</Key>
+            <Key onClick={() => onCommand('insert', ',')}    className="flex-1 max-w-[40px] bg-slate-800 text-white py-3">,</Key>
             <Key onClick={() => onCommand('insert', '\\,')} className="flex-[4] bg-slate-800 text-white py-3">Space</Key>
-            <Key onClick={() => onCommand('insert', '.')} className="flex-1 max-w-[40px] bg-slate-800 text-white py-3">.</Key>
+            <Key onClick={() => onCommand('insert', '.')}    className="flex-1 max-w-[40px] bg-slate-800 text-white py-3">.</Key>
             <Key onClick={onSubmit} className="flex-[1.5] max-w-[60px] bg-cyan-600 text-white py-3"><CornerDownLeft size={18} /></Key>
           </div>
         </div>
