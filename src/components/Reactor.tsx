@@ -202,6 +202,17 @@ export function Reactor({ module, onBack, onRequestAuth, forcedProblemIds }: Rea
         time_spent: timeSpent,
       });
 
+      if (!isCorrect && !forcedProblemIds) {
+        await supabase.from('user_errors').insert({
+          user_id: user.id,
+          problem_id: currentProblem.id,
+          module_id: module.id,
+          user_answer: userAnswer,
+          correct_answer: currentProblem.answer,
+          expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+        }).then(() => {});
+      }
+      
       if (isCorrect) {
         // Добавляем в локальный Set чтобы не дать бейдж повторно в этой же сессии
         setAlreadySolvedIds(prev => new Set([...prev, currentProblem.id]));
