@@ -64,7 +64,7 @@ const ACHIEVEMENT_SKINS = [
   { skinKey: 'absolute', name: '👑 Абсолют',       requirement: '#1 место в общем рейтинге', category: 'global' as const, icon: '👑', gradientBorder: 'from-yellow-900/60 to-slate-900 border-yellow-600/60'  },
 ];
 
-// ─── SkinList вынесен НАРУЖУ чтобы не ремаунтился при hover ──────────
+// ─── SkinList — вне CardSkinShop чтобы не ремаунтился ────────────────
 
 type SkinListProps = {
   allSkins: Cosmetic[];
@@ -74,11 +74,11 @@ type SkinListProps = {
   buying: string | null;
   profileCoins: number;
   profileIsPremium: boolean;
-  onHover: (key: string) => void;
+  onHover:    (key: string) => void;
   onHoverEnd: () => void;
-  onMobileTap: (key: string) => void;
-  onEquip: (key: string) => void;
-  onBuy: (item: Cosmetic) => void;
+  onMobileTap:(key: string) => void;
+  onEquip:    (key: string) => void;
+  onBuy:      (item: Cosmetic) => void;
 };
 
 function SkinList({
@@ -179,29 +179,35 @@ function SkinList({
             return (
               <div
                 key={ach.skinKey}
-                onMouseEnter={() => isUnlocked && onHover(ach.skinKey)}
+                // ✅ Превью доступно ВСЕМ — isUnlocked не проверяем
+                onMouseEnter={() => onHover(ach.skinKey)}
                 onMouseLeave={onHoverEnd}
-                onClick={() => { if (window.innerWidth < 768 && isUnlocked) onMobileTap(ach.skinKey); }}
+                onClick={() => { if (window.innerWidth < 768) onMobileTap(ach.skinKey); }}
                 className={`
                   relative flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all duration-200
                   bg-gradient-to-r ${ach.gradientBorder}
                   ${isPreviewing ? 'ring-1 ring-inset ring-white/20' : ''}
-                  ${isUnlocked ? 'cursor-pointer hover:brightness-110' : 'opacity-55 cursor-not-allowed'}
+                  cursor-pointer hover:brightness-110
                 `}
               >
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-xl shrink-0 ${isUnlocked ? 'bg-white/10' : 'bg-slate-800/50 grayscale'}`}>
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-xl shrink-0
+                  ${isUnlocked ? 'bg-white/10' : 'bg-slate-800/50 grayscale'}`}>
                   {ach.icon}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-white font-black text-sm leading-tight">{ach.name}</p>
-                  <p className="text-slate-400 text-[10px] mt-0.5">{meta.desc}</p>
-                  <div className={`flex items-center gap-1 mt-0.5 text-[9px] font-bold uppercase tracking-wider ${isUnlocked ? 'text-emerald-400' : 'text-slate-500'}`}>
+                  <p className={`font-black text-sm leading-tight ${isUnlocked ? 'text-white' : 'text-slate-400'}`}>
+                    {ach.name}
+                  </p>
+                  <p className="text-slate-500 text-[10px] mt-0.5">{meta.desc}</p>
+                  <div className={`flex items-center gap-1 mt-0.5 text-[9px] font-bold uppercase tracking-wider
+                    ${isUnlocked ? 'text-emerald-400' : 'text-slate-600'}`}>
                     {isUnlocked
                       ? <><CheckCircle className="w-2.5 h-2.5" /> Разблокировано</>
                       : <><Lock className="w-2.5 h-2.5" /> {ach.requirement}</>
                     }
                   </div>
                 </div>
+                {/* ✅ Кнопка "Надеть" — только для #1 */}
                 <div className="shrink-0" onClick={e => e.stopPropagation()}>
                   {isEquipped ? (
                     <div className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-500/20 border border-emerald-500/40 rounded-lg">
@@ -231,7 +237,7 @@ function SkinList({
   );
 }
 
-// ─── Превью карточки ─────────────────────────────────────────────────
+// ─── PreviewPanel — тоже вне CardSkinShop ────────────────────────────
 
 type PreviewPanelProps = {
   previewSkin: CardSkin;
@@ -315,7 +321,12 @@ export function CardSkinShop({ onClose }: { onClose: () => void }) {
 
   const equipSkin = async (skinId: string) => {
     if (!user) return;
-    await supabase.from('profiles').update({ equipped_card_skin: skinId }).eq('id', user.id);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ equipped_card_skin: skinId })
+      .eq('id', user.id);
+    // Триггер в БД отклонит запрос если нет прав на achievement-скин
+    if (error) { alert(error.message); return; }
     setActiveSkin(skinId);
     setPreviewSkin(skinId);
     refreshProfile();
@@ -342,9 +353,9 @@ export function CardSkinShop({ onClose }: { onClose: () => void }) {
     buying,
     profileCoins:     profile?.coins     ?? 0,
     profileIsPremium: profile?.is_premium ?? false,
-    onHover:    (key) => setPreviewSkin(key),
+    onHover:    (key) => setPreviewSkin(key as CardSkin),
     onHoverEnd: ()    => setPreviewSkin(activeSkin),
-    onMobileTap:(key) => { setPreviewSkin(key); setMobileTab('preview'); },
+    onMobileTap:(key) => { setPreviewSkin(key as CardSkin); setMobileTab('preview'); },
     onEquip:    equipSkin,
     onBuy:      buyItem,
   };
@@ -352,8 +363,8 @@ export function CardSkinShop({ onClose }: { onClose: () => void }) {
   const previewProps: PreviewPanelProps = {
     previewSkin,
     previewName,
-    username:      profile?.username    || 'Player',
-    mmr:           profile?.mmr         || 1000,
+    username:      profile?.username || 'Player',
+    mmr:           profile?.mmr      || 1000,
     pRank,
     winRate:       pvpStats.winRate,
     matchesPlayed: pvpStats.matchesPlayed,
@@ -368,12 +379,12 @@ export function CardSkinShop({ onClose }: { onClose: () => void }) {
           <X className="w-4 h-4" />
         </button>
 
-        {/* ── ДЕСКТОП: левая панель превью (не скроллится) ── */}
+        {/* ── ДЕСКТОП: превью (не скроллится) ── */}
         <div className="hidden md:flex w-[45%] bg-slate-900/60 flex-col border-r border-slate-800/80 flex-shrink-0">
           <PreviewPanel {...previewProps} />
         </div>
 
-        {/* ── ДЕСКТОП: правая панель (скроллится только список) ── */}
+        {/* ── ДЕСКТОП: список (скроллится) ── */}
         <div className="hidden md:flex w-[55%] flex-col h-full min-h-0">
           <div className="px-6 pt-5 pb-4 border-b border-slate-800/80 flex-shrink-0">
             <div className="flex items-start justify-between pr-8">
@@ -392,7 +403,6 @@ export function CardSkinShop({ onClose }: { onClose: () => void }) {
             </div>
           </div>
 
-          {/* flex-1 + overflow-y-auto — скролл только здесь */}
           <div className="flex-1 overflow-y-auto min-h-0">
             {loading
               ? <div className="flex items-center justify-center h-40 text-slate-500 text-sm animate-pulse">Загрузка...</div>
