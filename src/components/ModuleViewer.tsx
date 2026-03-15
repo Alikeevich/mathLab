@@ -82,7 +82,9 @@ export function ModuleViewer({ sector, onBack, onStartExperiment }: ModuleViewer
 
             // Локализация модуля
             const modName = i18n.language === 'kk' && module.name_kz ? module.name_kz : module.name;
-            const modTheory = i18n.language === 'kk' && module.theory_content_kz ? module.theory_content_kz : module.theory_content;
+            const modTheory = i18n.language === 'kk' && (module as any).description_kz
+              ? (module as any).description_kz
+              : (module as any).description ?? module.theory_content;
 
             return (
               <div
